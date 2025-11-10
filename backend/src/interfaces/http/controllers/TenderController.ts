@@ -12,7 +12,8 @@ export class TenderController {
       const tender = await this.service.createTender({
         ...req.body,
         documentFile: files?.documentFile?.[0],
-        nitDocumentFile: files?.nitDocumentFile?.[0]
+        nitDocumentFile: files?.nitDocumentFile?.[0],
+        emdDocumentFile: files?.emdDocumentFile?.[0]
       });
 
       res.status(201).json({
@@ -34,7 +35,8 @@ export class TenderController {
       const updatedTender = await this.service.updateTender(id, {
         ...req.body,
         documentFile: files?.documentFile?.[0],
-        nitDocumentFile: files?.nitDocumentFile?.[0]
+        nitDocumentFile: files?.nitDocumentFile?.[0],
+        emdDocumentFile: files?.emdDocumentFile?.[0]
       });
 
       res.json({
@@ -103,10 +105,38 @@ export class TenderController {
 
   updateStatus = async (req: Request, res: Response) => {
     try {
+      console.log('updateStatus called with:', { id: req.params.id, status: req.body.status });
       const { id } = req.params;
       const { status } = req.body;
 
+      console.log('Calling service updateTenderStatus...');
       const updatedTender = await this.service.updateTenderStatus(id, status);
+      console.log('Service call successful, updated tender:', updatedTender);
+
+      res.json({
+        status: 'success',
+        data: updatedTender
+      });
+    } catch (error) {
+      console.error('Error in updateStatus:', error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Failed to update tender status');
+    }
+  };
+
+  updateEMDReturnStatus = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { emdReturnStatus, emdReturnDate, emdReturnAmount } = req.body;
+
+      const updatedTender = await this.service.updateEMDReturnStatus(
+        id,
+        emdReturnStatus,
+        emdReturnDate ? new Date(emdReturnDate) : undefined,
+        emdReturnAmount ? parseFloat(emdReturnAmount) : undefined
+      );
 
       res.json({
         status: 'success',
@@ -116,7 +146,7 @@ export class TenderController {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Failed to update tender status');
+      throw new AppError('Failed to update EMD return status');
     }
   };
 } 

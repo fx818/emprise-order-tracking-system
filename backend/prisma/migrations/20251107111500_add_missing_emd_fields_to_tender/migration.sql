@@ -1,0 +1,8 @@
+-- Add missing EMD fields to Tender table
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "emdBankName" TEXT;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "emdSubmissionDate" TIMESTAMP(3);
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "emdMaturityDate" TIMESTAMP(3);
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "emdDocumentUrl" TEXT;
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "emdReturnStatus" "EMDReturnStatus";
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "emdReturnDate" TIMESTAMP(3);
+ALTER TABLE "Tender" ADD COLUMN IF NOT EXISTS "emdReturnAmount" DOUBLE PRECISION;

@@ -3,6 +3,7 @@ import { Result, ResultUtils } from '../../shared/types/common.types';
 import { CreateLoaDto } from '../dtos/loa/CreateLoaDto';
 import { CreateAmendmentDto  } from '../dtos/loa/CreateAmendmentDto';
 import { UpdateStatusDto } from '../dtos/loa/UpdateStatusDto';
+import { CreateOtherDocumentDto } from '../dtos/loa/CreateOtherDocumentDto';
 
 interface ValidationError {
   field: string;
@@ -68,16 +69,6 @@ export class LoaValidator {
       errors.push({ field: 'emdAmount', message: 'EMD amount must be a positive number when EMD is enabled' });
     }
 
-    // Security Deposit validation - simplified
-    if (dto.hasSecurityDeposit === true && dto.securityDepositAmount !== undefined && dto.securityDepositAmount <= 0) {
-      errors.push({ field: 'securityDepositAmount', message: 'Security deposit amount must be a positive number when security deposit is enabled' });
-    }
-
-    // Performance Guarantee validation - simplified
-    if (dto.hasPerformanceGuarantee === true && dto.performanceGuaranteeAmount !== undefined && dto.performanceGuaranteeAmount <= 0) {
-      errors.push({ field: 'performanceGuaranteeAmount', message: 'Performance guarantee amount must be a positive number when performance guarantee is enabled' });
-    }
-
     return errors.length === 0 ? ResultUtils.ok([]) : ResultUtils.ok(errors);
   }
 
@@ -101,14 +92,24 @@ export class LoaValidator {
 
   validateStatusUpdate(dto: UpdateStatusDto): Result<ValidationError[]> {
     const errors: ValidationError[] = [];
-    const validStatuses = ['DRAFT', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'DELAYED'];
+    const validStatuses = [
+      'NOT_STARTED',
+      'IN_PROGRESS',
+      'SUPPLY_WORK_COMPLETED',
+      'CHASE_PAYMENT',
+      'CLOSED',
+      'SUPPLY_WORK_DELAYED',
+      'APPLICATION_PENDING',
+      'UPLOAD_BILL',
+      'RETRIEVE_EMD_SECURITY'
+    ];
 
     if (!dto.status) {
       errors.push({ field: 'status', message: 'Status is required' });
     } else if (!validStatuses.includes(dto.status)) {
-      errors.push({ 
-        field: 'status', 
-        message: `Status must be one of: ${validStatuses.join(', ')}` 
+      errors.push({
+        field: 'status',
+        message: `Status must be one of: ${validStatuses.join(', ')}`
       });
     }
 
@@ -117,8 +118,26 @@ export class LoaValidator {
 
   validateId(id: string): Result<ValidationError[]> {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(id) 
-      ? ResultUtils.ok([]) 
+    return uuidRegex.test(id)
+      ? ResultUtils.ok([])
       : ResultUtils.ok([{ field: 'id', message: 'Invalid ID format' }]);
+  }
+
+  validateOtherDocument(dto: CreateOtherDocumentDto): Result<ValidationError[]> {
+    const errors: ValidationError[] = [];
+
+    // Title validation
+    if (!dto.title?.trim()) {
+      errors.push({ field: 'title', message: 'Document title is required' });
+    } else if (dto.title.length < 3 || dto.title.length > 100) {
+      errors.push({ field: 'title', message: 'Document title must be between 3 and 100 characters' });
+    }
+
+    // Document file validation
+    if (!dto.documentFile) {
+      errors.push({ field: 'documentFile', message: 'Document file is required' });
+    }
+
+    return errors.length === 0 ? ResultUtils.ok([]) : ResultUtils.ok(errors);
   }
 }

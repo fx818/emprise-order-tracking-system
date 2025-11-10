@@ -21,14 +21,10 @@ export class PrismaFdrRepository {
     contractDetails?: string;
     poc?: string;
     location?: string;
-    emdAmount?: number;
-    sdAmount?: number;
     documentUrl?: string;
     extractedData?: any;
     status?: FDRStatus;
     offerId?: string;
-    loaId?: string;
-    tenderId?: string;
     tags?: string[];
   }): Promise<FDR> {
     return this.prisma.fDR.create({
@@ -46,15 +42,11 @@ export class PrismaFdrRepository {
         contractDetails: data.contractDetails,
         poc: data.poc,
         location: data.location,
-        emdAmount: data.emdAmount,
-        sdAmount: data.sdAmount,
         documentUrl: data.documentUrl,
         extractedData: data.extractedData,
         status: data.status || 'RUNNING',
         // Only set foreign keys if they have valid values (not empty strings)
         ...(data.offerId && data.offerId.trim() !== '' ? { offerId: data.offerId } : {}),
-        ...(data.loaId && data.loaId.trim() !== '' ? { loaId: data.loaId } : {}),
-        ...(data.tenderId && data.tenderId.trim() !== '' ? { tenderId: data.tenderId } : {}),
         tags: data.tags || [],
       },
       include: {
@@ -63,20 +55,6 @@ export class PrismaFdrRepository {
             id: true,
             offerId: true,
             subject: true,
-          },
-        },
-        loa: {
-          select: {
-            id: true,
-            loaNumber: true,
-            loaValue: true,
-          },
-        },
-        tender: {
-          select: {
-            id: true,
-            tenderNumber: true,
-            description: true,
           },
         },
       },
@@ -97,20 +75,6 @@ export class PrismaFdrRepository {
             subject: true,
           },
         },
-        loa: {
-          select: {
-            id: true,
-            loaNumber: true,
-            loaValue: true,
-          },
-        },
-        tender: {
-          select: {
-            id: true,
-            tenderNumber: true,
-            description: true,
-          },
-        },
       },
     });
   }
@@ -123,8 +87,6 @@ export class PrismaFdrRepository {
     category?: FDRCategory;
     status?: FDRStatus;
     offerId?: string;
-    loaId?: string;
-    tenderId?: string;
     skip?: number;
     take?: number;
     sortBy?: string;
@@ -142,14 +104,6 @@ export class PrismaFdrRepository {
 
     if (params?.offerId) {
       where.offerId = params.offerId;
-    }
-
-    if (params?.loaId) {
-      where.loaId = params.loaId;
-    }
-
-    if (params?.tenderId) {
-      where.tenderId = params.tenderId;
     }
 
     if (params?.searchTerm) {
@@ -182,20 +136,6 @@ export class PrismaFdrRepository {
             subject: true,
           },
         },
-        loa: {
-          select: {
-            id: true,
-            loaNumber: true,
-            loaValue: true,
-          },
-        },
-        tender: {
-          select: {
-            id: true,
-            tenderNumber: true,
-            description: true,
-          },
-        },
       },
     });
   }
@@ -208,8 +148,6 @@ export class PrismaFdrRepository {
     category?: FDRCategory;
     status?: FDRStatus;
     offerId?: string;
-    loaId?: string;
-    tenderId?: string;
   }): Promise<number> {
     const where: any = {};
 
@@ -223,14 +161,6 @@ export class PrismaFdrRepository {
 
     if (params?.offerId) {
       where.offerId = params.offerId;
-    }
-
-    if (params?.loaId) {
-      where.loaId = params.loaId;
-    }
-
-    if (params?.tenderId) {
-      where.tenderId = params.tenderId;
     }
 
     if (params?.searchTerm) {
@@ -263,14 +193,10 @@ export class PrismaFdrRepository {
     contractDetails: string | null;
     poc: string | null;
     location: string | null;
-    emdAmount: number | null;
-    sdAmount: number | null;
     documentUrl: string;
     extractedData: any;
     status: FDRStatus;
     offerId: string | null;
-    loaId: string | null;
-    tenderId: string | null;
     tags: string[];
   }>): Promise<FDR> {
     return this.prisma.fDR.update({
@@ -282,20 +208,6 @@ export class PrismaFdrRepository {
             id: true,
             offerId: true,
             subject: true,
-          },
-        },
-        loa: {
-          select: {
-            id: true,
-            loaNumber: true,
-            loaValue: true,
-          },
-        },
-        tender: {
-          select: {
-            id: true,
-            tenderNumber: true,
-            description: true,
           },
         },
       },
@@ -326,20 +238,6 @@ export class PrismaFdrRepository {
             subject: true,
           },
         },
-        loa: {
-          select: {
-            id: true,
-            loaNumber: true,
-            loaValue: true,
-          },
-        },
-        tender: {
-          select: {
-            id: true,
-            tenderNumber: true,
-            description: true,
-          },
-        },
       },
     });
   }
@@ -362,41 +260,6 @@ export class PrismaFdrRepository {
     });
   }
 
-  /**
-   * Find FDRs by LOA ID
-   */
-  async findByLoaId(loaId: string): Promise<FDR[]> {
-    return this.prisma.fDR.findMany({
-      where: { loaId },
-      include: {
-        loa: {
-          select: {
-            id: true,
-            loaNumber: true,
-            loaValue: true,
-          },
-        },
-      },
-    });
-  }
-
-  /**
-   * Find FDRs by Tender ID
-   */
-  async findByTenderId(tenderId: string): Promise<FDR[]> {
-    return this.prisma.fDR.findMany({
-      where: { tenderId },
-      include: {
-        tender: {
-          select: {
-            id: true,
-            tenderNumber: true,
-            description: true,
-          },
-        },
-      },
-    });
-  }
 
   /**
    * Find expiring FDRs (within specified days)
@@ -425,20 +288,6 @@ export class PrismaFdrRepository {
             subject: true,
           },
         },
-        loa: {
-          select: {
-            id: true,
-            loaNumber: true,
-            loaValue: true,
-          },
-        },
-        tender: {
-          select: {
-            id: true,
-            tenderNumber: true,
-            description: true,
-          },
-        },
       },
     });
   }
@@ -465,20 +314,6 @@ export class PrismaFdrRepository {
             id: true,
             offerId: true,
             subject: true,
-          },
-        },
-        loa: {
-          select: {
-            id: true,
-            loaNumber: true,
-            loaValue: true,
-          },
-        },
-        tender: {
-          select: {
-            id: true,
-            tenderNumber: true,
-            description: true,
           },
         },
       },

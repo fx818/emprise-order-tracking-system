@@ -1,14 +1,12 @@
-// Database configuration
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-// User and Authentication
 model User {
   id             String           @id @default(uuid())
   email          String           @unique
@@ -16,12 +14,365 @@ model User {
   name           String
   role           UserRole
   department     String?
-  createdOffers  BudgetaryOffer[] @relation("CreatedBy")
-  approvedOffers BudgetaryOffer[] @relation("ApprovedBy")
-  createdPOs     PurchaseOrder[]  @relation("POCreatedBy")
-  approvedPOs    PurchaseOrder[]  @relation("POApprovedBy")
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
+  approvedOffers BudgetaryOffer[] @relation("ApprovedBy")
+  createdOffers  BudgetaryOffer[] @relation("CreatedBy")
+  approvedPOs    PurchaseOrder[]  @relation("POApprovedBy")
+  createdPOs     PurchaseOrder[]  @relation("POCreatedBy")
+}
+
+model BudgetaryOffer {
+  id               String      @id @default(uuid())
+  offerId          String      @unique
+  offerDate        DateTime
+  toAuthority      String
+  subject          String
+  workItems        Json
+  termsConditions  String
+  documentUrl      String?
+  documentHash     String?
+  status           OfferStatus
+  createdById      String
+  approverId       String?
+  approvalComments String?
+  approvalDate     DateTime?
+  approvalHistory  Json[]
+  tags             String[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  customerId       String?     @default("CR")
+  approver         User?       @relation("ApprovedBy", fields: [approverId], references: [id])
+  createdBy        User        @relation("CreatedBy", fields: [createdById], references: [id])
+  emailLogs        EmailLog[]
+  fdrs             FDR[]
+}
+
+model EmailLog {
+  id               String         @id @default(uuid())
+  budgetaryOfferId String
+  to               String[]
+  cc               String[]
+  bcc              String[]
+  subject          String
+  content          String
+  messageId        String?
+  status           EmailStatus
+  error            String?
+  sentAt           DateTime       @default(now())
+  budgetaryOffer   BudgetaryOffer @relation(fields: [budgetaryOfferId], references: [id])
+
+  @@index([budgetaryOfferId])
+}
+
+model Site {
+  id             String          @id @default(uuid())
+  name           String
+  code           String          @unique
+  zoneId         String
+  location       String?
+  address        String
+  contactPerson  String?
+  contactPhone   String?
+  contactEmail   String?
+  status         SiteStatus      @default(ACTIVE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  loas           LOA[]
+  purchaseOrders PurchaseOrder[]
+  tenders        Tender[]
+  zone           Customer        @relation(fields: [zoneId], references: [id])
+
+  @@unique([name, zoneId])
+  @@index([zoneId])
+}
+
+model LOA {
+  id                     String          @id @default(uuid())
+  loaNumber              String          @unique
+  loaValue               Float
+  siteId                 String?
+  deliveryPeriod         Json
+  workDescription        String
+  documentUrl            String
+  tags                   String[]
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  emdAmount              Float?
+  hasEmd                 Boolean         @default(false)
+  status                 LOAStatus       @default(NOT_STARTED)
+  dueDate                DateTime?
+  warrantyPeriodMonths   Int?
+  warrantyPeriodYears    Int?
+  warrantyStartDate      DateTime?
+  warrantyEndDate        DateTime?
+  orderReceivedDate      DateTime?
+  remarks                String?
+  tenderNo               String?
+  orderPOC               String?
+  pocId                  String?
+  inspectionAgencyId     String?
+  fdBgDetails            String?
+  daysToDueDateFromExcel Int?
+  tenderId               String?
+  hasSd                  Boolean         @default(false)
+  sdFdrId                String?         @unique
+  hasPg                  Boolean         @default(false)
+  pgFdrId                String?         @unique
+  receivablePending      Float?
+  actualAmountReceived   Float?
+  amountDeducted         Float?
+  amountPending          Float?
+  deductionReason        String?
+  amendments             Amendment[]
+  invoices               Invoice[]
+  otherDocuments         OtherDocument[]
+  site                   Site?              @relation(fields: [siteId], references: [id])
+  tender                 Tender?            @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  poc                    POC?               @relation(fields: [pocId], references: [id])
+  inspectionAgency       InspectionAgency?  @relation(fields: [inspectionAgencyId], references: [id])
+  purchaseOrders         PurchaseOrder[]
+  sdFdr                  FDR?            @relation("LOASecurityDeposit", fields: [sdFdrId], references: [id])
+  pgFdr                  FDR?            @relation("LOAPerformanceGuarantee", fields: [pgFdrId], references: [id])
+
+  @@index([siteId])
+  @@index([dueDate])
+  @@index([tenderId])
+  @@index([pocId])
+  @@index([inspectionAgencyId])
+  @@index([sdFdrId])
+  @@index([pgFdrId])
+}
+
+model Amendment {
+  id              String   @id @default(uuid())
+  amendmentNumber String
+  documentUrl     String
+  loaId           String
+  tags            String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  loa             LOA      @relation(fields: [loaId], references: [id])
+}
+
+model OtherDocument {
+  id          String   @id @default(uuid())
+  title       String
+  documentUrl String
+  loaId       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  loa         LOA      @relation(fields: [loaId], references: [id], onDelete: Cascade)
+
+  @@index([loaId])
+}
+
+model PurchaseOrder {
+  id                String              @id @default(uuid())
+  poNumber          String              @unique
+  siteId            String
+  loaId             String
+  vendorId          String
+  requirementDesc   String
+  termsConditions   String
+  shipToAddress     String
+  baseAmount        Float               @default(0)
+  taxAmount         Float               @default(0)
+  additionalCharges Json[]
+  totalAmount       Float               @default(0)
+  notes             String?
+  documentUrl       String?
+  documentHash      String?
+  status            POStatus
+  createdById       String
+  approverId        String?
+  approvalComments  String?
+  rejectionReason   String?
+  approvalHistory   Json[]
+  tags              String[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  approver          User?               @relation("POApprovedBy", fields: [approverId], references: [id])
+  createdBy         User                @relation("POCreatedBy", fields: [createdById], references: [id])
+  loa               LOA                 @relation(fields: [loaId], references: [id])
+  site              Site                @relation(fields: [siteId], references: [id])
+  vendor            Vendor              @relation(fields: [vendorId], references: [id])
+  items             PurchaseOrderItem[]
+
+  @@index([siteId])
+  @@index([loaId])
+  @@index([vendorId])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  itemId          String
+  quantity        Float
+  unitPrice       Float?
+  totalAmount     Float?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  item            Item          @relation(fields: [itemId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([itemId])
+}
+
+model Vendor {
+  id             String          @id @default(uuid())
+  name           String
+  email          String          @unique
+  mobile         String
+  gstin          String?
+  address        String
+  bankDetails    Json
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  purchaseOrders PurchaseOrder[]
+  items          VendorItem[]
+}
+
+model Item {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  unitPrice   Float?
+  uom         String
+  hsnCode     String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  poItems     PurchaseOrderItem[]
+  vendors     VendorItem[]
+}
+
+model VendorItem {
+  vendorId  String
+  itemId    String
+  unitPrice Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item      Item     @relation(fields: [itemId], references: [id])
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+
+  @@id([vendorId, itemId])
+}
+
+model Customer {
+  id           String   @id
+  name         String
+  headquarters String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  sites        Site[]
+
+  @@map("customers")
+}
+
+model Tender {
+  id                String           @id @default(uuid())
+  tenderNumber      String           @unique
+  dueDate           DateTime
+  description       String
+  hasEMD            Boolean          @default(false)
+  emdAmount         Float?
+  emdBankName       String?
+  emdSubmissionDate DateTime?
+  emdMaturityDate   DateTime?
+  emdDocumentUrl    String?
+  emdReturnStatus   EMDReturnStatus?
+  emdReturnDate     DateTime?
+  emdReturnAmount   Float?
+  documentUrl       String?
+  tags              String[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  nitDocumentUrl    String?
+  status            TenderStatus     @default(ACTIVE)
+  siteId            String?
+  loas              LOA[]
+  site              Site?            @relation(fields: [siteId], references: [id])
+
+  @@index([siteId])
+}
+
+model ShippingAddress {
+  id        String   @id @default(uuid())
+  label     String
+  address   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model POC {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  loas      LOA[]
+
+  @@map("pocs")
+}
+
+model InspectionAgency {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  loas      LOA[]
+
+  @@map("inspection_agencies")
+}
+
+model Invoice {
+  id            String     @id @default(uuid())
+  loaId         String
+  invoiceNumber String?
+  invoiceAmount Float?
+  billLinks     String?
+  remarks       String?
+  status        BillStatus @default(REGISTERED)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  invoicePdfUrl String?
+  loa           LOA        @relation(fields: [loaId], references: [id], onDelete: Cascade)
+
+  @@index([loaId])
+}
+
+model FDR {
+  id              String          @id(map: "EMD_pkey") @default(uuid())
+  depositAmount   Float
+  dateOfDeposit   DateTime
+  maturityDate    DateTime?
+  bankName        String          @default("IDBI")
+  documentUrl     String?
+  extractedData   Json?
+  offerId         String?
+  tags            String[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  category        FDRCategory     @default(FD)
+  accountNo       String?
+  fdrNumber       String?
+  accountName     String?
+  maturityValue   Float?
+  contractNo      String?
+  contractDetails String?
+  poc             String?
+  location        String?
+  status          FDRStatus       @default(RUNNING)
+  offer           BudgetaryOffer? @relation(fields: [offerId], references: [id], map: "EMD_offerId_fkey")
+  loaForSD        LOA?            @relation("LOASecurityDeposit")
+  loaForPG        LOA?            @relation("LOAPerformanceGuarantee")
+
+  @@index([offerId])
+  @@index([status])
+  @@index([maturityDate])
+  @@index([category])
+  @@map("fdrs")
 }
 
 enum UserRole {
@@ -33,56 +384,11 @@ enum UserRole {
   PO_SPECIALIST
 }
 
-// Budgetary Offer Management
-model BudgetaryOffer {
-  id               String       @id @default(uuid())
-  offerId          String       @unique // BO/2024/0001
-  offerDate        DateTime
-  toAuthority      String
-  subject          String
-  workItems        Json         // Array of work items
-  termsConditions  String       @db.Text
-  documentUrl      String?      // S3 URL
-  documentHash     String?      // For digital signature verification
-  status           OfferStatus
-  createdBy        User         @relation("CreatedBy", fields: [createdById], references: [id])
-  createdById      String
-  approver         User?        @relation("ApprovedBy", fields: [approverId], references: [id])
-  approverId       String?
-  approvalComments String?      @db.Text
-  approvalDate     DateTime?
-  approvalHistory  Json[]
-  tags             String[]
-  emailLogs        EmailLog[]
-  fdrs             FDR[]        // FDRs associated with this offer
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  customerId       String?      @default("CR")
-}
-
 enum OfferStatus {
   DRAFT
   PENDING_APPROVAL
   APPROVED
   REJECTED
-}
-
-// Email Tracking
-model EmailLog {
-  id              String         @id @default(uuid())
-  budgetaryOffer  BudgetaryOffer @relation(fields: [budgetaryOfferId], references: [id])
-  budgetaryOfferId String
-  to              String[]
-  cc              String[]
-  bcc             String[]
-  subject         String
-  content         String         @db.Text
-  messageId       String?
-  status          EmailStatus
-  error           String?        @db.Text
-  sentAt          DateTime       @default(now())
-
-  @@index([budgetaryOfferId])
 }
 
 enum EmailStatus {
@@ -96,150 +402,16 @@ enum SiteStatus {
   UNDER_MAINTENANCE
 }
 
-// LOA status matching Excel sheet statuses
 enum LOAStatus {
-  NOT_STARTED           // 1. Not Started
-  IN_PROGRESS           // 2. In Progress
-  SUPPLY_WORK_DELAYED   // 3. Supply/Work Delayed
-  SUPPLY_WORK_COMPLETED // 4. Supply/Work Completed
-  APPLICATION_PENDING   // 5. Application Pending
-  UPLOAD_BILL           // 6. Upload Bill
-  CHASE_PAYMENT         // 7. Chase Payment
-  RETRIEVE_EMD_SECURITY // 8. Retrieve EMD/Security
-  CLOSED                // 9. Closed
-}
-
-model Site {
-  id              String           @id @default(uuid())
-  name            String           // Removed @unique - sites can have same name across different customers
-  code            String           @unique  // For easy reference like MUM001, DEL002
-  zoneId          String           // References customer id
-  zone            Customer         @relation(fields: [zoneId], references: [id])
-  location        String?          // Specific location details
-  address         String           @db.Text
-  contactPerson   String?
-  contactPhone    String?
-  contactEmail    String?
-  status          SiteStatus       @default(ACTIVE)
-  loas            LOA[]            // Sites where work is being executed
-  purchaseOrders  PurchaseOrder[]  // POs related to this site
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  @@unique([name, zoneId])  // Composite unique: same site name allowed across different customers
-  @@index([zoneId])
-}
-
-// LOA Management
-model LOA {
-  id                           String           @id @default(uuid())
-  loaNumber                    String           @unique
-  loaValue                     Float
-  site                         Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  siteId                       String?          // Optional field
-  deliveryPeriod               Json             // { start: Date, end: Date }
-  dueDate                      DateTime?        // Due date for LOA completion
-  orderReceivedDate            DateTime?        // Date when order/LOA was received
-  workDescription              String
-  documentUrl                  String           // S3 URL of LOA document
-  status                       LOAStatus        @default(NOT_STARTED)
-  amendments                   Amendment[]
-  purchaseOrders               PurchaseOrder[]
-  invoices                     Invoice[]        // Billing/Invoice records
-  fdrs                         FDR[]            // FDRs associated with this LOA
-  tags                         String[]
-  remarks                      String?          @db.Text // LOA-level remarks
-  // Warranty period fields
-  warrantyPeriodMonths         Int?             // Warranty period in months
-  warrantyPeriodYears          Int?             // Warranty period in years
-  warrantyStartDate            DateTime?        // When warranty period starts
-  warrantyEndDate              DateTime?        // Calculated or manually set warranty end date
-  // New fields for EMD
-  hasEmd                       Boolean          @default(false)
-  emdAmount                    Float?
-  // New fields for security deposit
-  hasSecurityDeposit           Boolean          @default(false)
-  securityDepositAmount        Float?
-  securityDepositDocumentUrl   String?
-  // New fields for performance guarantee
-  hasPerformanceGuarantee      Boolean          @default(false)
-  performanceGuaranteeAmount   Float?
-  performanceGuaranteeDocumentUrl String?
-  // Additional fields from bulk import
-  tenderNo                     String?          // Tender number reference
-  orderPOC                     String?          // Point of contact for the order
-  fdBgDetails                  String?          @db.Text // FD/BG details
-  daysToDueDateFromExcel       Int?             // Days to due date as extracted from Excel (negative=overdue, positive=remaining, null=completed)
-  createdAt                    DateTime         @default(now())
-  updatedAt                    DateTime         @updatedAt
-
-  @@index([siteId])
-  @@index([dueDate])
-}
-
-model Amendment {
-  id              String    @id @default(uuid())
-  amendmentNumber String
-  documentUrl     String    // S3 URL of amendment document
-  loa             LOA       @relation(fields: [loaId], references: [id])
-  loaId           String
-  tags            String[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-}
-
-// Purchase Order Management
-model PurchaseOrder {
-  id                String             @id @default(uuid())
-  poNumber          String             @unique
-  site              Site               @relation(fields: [siteId], references: [id])
-  siteId            String
-  loa               LOA                @relation(fields: [loaId], references: [id])
-  loaId             String
-  vendor            Vendor             @relation(fields: [vendorId], references: [id])
-  vendorId          String
-  items             PurchaseOrderItem[]
-  requirementDesc   String
-  termsConditions   String             @db.Text
-  shipToAddress     String
-  baseAmount        Float              @default(0)
-  taxAmount         Float              @default(0)
-  additionalCharges Json[]             // Add this field for storing additional charges
-  totalAmount       Float              @default(0)
-  notes             String?
-  documentUrl       String?
-  documentHash      String?
-  status            POStatus
-  createdBy         User               @relation("POCreatedBy", fields: [createdById], references: [id])
-  createdById       String
-  approver          User?              @relation("POApprovedBy", fields: [approverId], references: [id])
-  approverId        String?
-  approvalComments  String?            @db.Text
-  rejectionReason   String?            @db.Text
-  approvalHistory   Json[]
-  tags              String[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-
-  @@index([siteId])
-  @@index([loaId])
-  @@index([vendorId])
-}
-
-model PurchaseOrderItem {
-  id              String        @id @default(uuid())
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
-  purchaseOrderId String
-  item            Item          @relation(fields: [itemId], references: [id])
-  itemId          String
-  quantity        Float
-  unitPrice       Float?        // Price at time of purchase
-  totalAmount     Float?        // Calculated total including tax
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  @@index([purchaseOrderId])
-  @@index([itemId])
+  NOT_STARTED
+  IN_PROGRESS
+  SUPPLY_WORK_COMPLETED
+  CHASE_PAYMENT
+  CLOSED
+  SUPPLY_WORK_DELAYED
+  APPLICATION_PENDING
+  UPLOAD_BILL
+  RETRIEVE_EMD_SECURITY
 }
 
 enum POStatus {
@@ -247,75 +419,6 @@ enum POStatus {
   PENDING_APPROVAL
   APPROVED
   REJECTED
-}
-
-// Vendor and Item Management
-model Vendor {
-  id             String           @id @default(uuid())
-  name           String
-  email          String           @unique
-  mobile         String
-  gstin          String?
-  address        String
-  bankDetails    Json
-  items          VendorItem[]
-  purchaseOrders PurchaseOrder[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-}
-
-model Item {
-  id          String             @id @default(uuid())
-  name        String
-  description String?
-  unitPrice   Float?
-  uom         String             // Unit of Measurement
-  hsnCode     String?
-  vendors     VendorItem[]
-  poItems     PurchaseOrderItem[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-}
-
-model VendorItem {
-  vendor    Vendor    @relation(fields: [vendorId], references: [id])
-  vendorId  String
-  item      Item      @relation(fields: [itemId], references: [id])
-  itemId    String
-  unitPrice Float     // Vendor specific price
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@id([vendorId, itemId])
-}
-
-// Customer Management
-model Customer {
-  id           String    @id
-  name         String
-  headquarters String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  sites        Site[]
-  
-  @@map("customers")
-}
-
-// Tender Management
-model Tender {
-  id              String        @id @default(uuid())
-  tenderNumber    String        @unique
-  dueDate         DateTime
-  description     String        @db.Text
-  hasEMD          Boolean       @default(false)
-  emdAmount       Float?
-  status          TenderStatus  @default(ACTIVE)
-  documentUrl     String?       // S3 URL of tender document
-  nitDocumentUrl  String?       // S3 URL of NIT document
-  fdrs            FDR[]         // FDRs associated with this tender
-  tags            String[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
 }
 
 enum TenderStatus {
@@ -326,100 +429,30 @@ enum TenderStatus {
   NOT_AWARDED
 }
 
-// Shipping Address Management
-model ShippingAddress {
-  id        String   @id @default(uuid())
-  label     String   // e.g., "Office", "Warehouse", "Site A"
-  address   String   @db.Text
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// Invoice/Billing Management
-model Invoice {
-  id                    String    @id @default(uuid())
-  loa                   LOA       @relation(fields: [loaId], references: [id], onDelete: Cascade)
-  loaId                 String
-  invoiceNumber         String?   // Last Invoice No.
-  invoiceAmount         Float?    // Last Invoice Amount
-  totalReceivables      Float?    // Total Receivables
-  actualAmountReceived  Float?    // Actual Amount Received
-  amountDeducted        Float?    // Amount Deducted
-  amountPending         Float?    // Amount Pending
-  deductionReason       String?   // Reason for deduction
-  billLinks             String?   // Bill Links
-  invoicePdfUrl         String?   // S3 URL of invoice PDF document
-  remarks               String?   @db.Text // Additional remarks
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  @@index([loaId])
-}
-
-// FDR (Fixed Deposit Receipt) & BG (Bank Guarantee) Management
-model FDR {
-  id                String      @id @default(uuid())
-
-  // Basic FDR/BG Information
-  category          FDRCategory @default(FD)          // FD or BG
-  bankName          String      @default("IDBI")      // Bank name
-  accountNo         String?                           // Bank account number
-  fdrNumber         String?                           // FD/BG number
-  accountName       String?                           // Account holder name
-
-  // Financial Details
-  depositAmount     Float                             // Principal deposit amount
-  dateOfDeposit     DateTime                          // Date of deposit/submission
-  maturityValue     Float?                            // Maturity value (for FD)
-  maturityDate      DateTime?                         // Maturity date
-
-  // Contract/Project Information
-  contractNo        String?                           // Contract/PO number
-  contractDetails   String?       @db.Text            // Description of work/contract
-  poc               String?                           // Point of contact
-  location          String?                           // Site/location
-
-  // Deposit Usage
-  emdAmount         Float?                            // If used as EMD
-  sdAmount          Float?                            // If used as Security Deposit
-
-  // Document Management
-  documentUrl       String?                           // S3 URL of FDR/BG document
-  extractedData     Json?                             // Store OCR extracted text and AI parsed data
-
-  // Status
-  status            FDRStatus   @default(RUNNING)
-
-  // Relations - FDR can be linked to Offer, LOA, or Tender
-  offer             BudgetaryOffer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  offerId           String?
-  loa               LOA?            @relation(fields: [loaId], references: [id], onDelete: SetNull)
-  loaId             String?
-  tender            Tender?         @relation(fields: [tenderId], references: [id], onDelete: SetNull)
-  tenderId          String?
-
-  tags              String[]
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-
-  @@index([offerId])
-  @@index([loaId])
-  @@index([tenderId])
-  @@index([status])
-  @@index([maturityDate])
-  @@index([category])
-  @@map("fdrs")
-}
-
 enum FDRCategory {
-  FD    // Fixed Deposit
-  BG    // Bank Guarantee
+  SD
+  PG
+  FD
+  BG
 }
 
 enum FDRStatus {
-  RUNNING      // Active/Running
-  COMPLETED    // Completed
-  CANCELLED    // FD Cancelled
-  RETURNED     // Returned/Released
+  RUNNING
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum EMDReturnStatus {
+  PENDING
+  RETURNED
+  NOT_RETURNED
+  RELEASED
+  RETAINED_AS_SD
+}
+
+enum BillStatus {
+  REGISTERED
+  RETURNED
+  PAYMENT_MADE
 }

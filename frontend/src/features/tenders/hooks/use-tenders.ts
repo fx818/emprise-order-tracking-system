@@ -82,7 +82,7 @@ export function useTenders() {
   const createTender = useCallback(async (formData: TenderFormData) => {
     try {
       setLoading(true);
-      
+
       // Create form data for file upload
       const form = new FormData();
       for (const key in formData) {
@@ -90,19 +90,27 @@ export function useTenders() {
           form.append('documentFile', formData.documentFile as File);
         } else if (key === 'nitDocumentFile' && formData.nitDocumentFile) {
           form.append('nitDocumentFile', formData.nitDocumentFile as File);
+        } else if (key === 'emdDocumentFile' && formData.emdDocumentFile) {
+          form.append('emdDocumentFile', formData.emdDocumentFile as File);
         } else if (key === 'tags' && Array.isArray(formData.tags)) {
           form.append('tags', JSON.stringify(formData.tags));
+        } else if (key === 'emdSubmissionDate' || key === 'emdMaturityDate') {
+          // Handle date fields
+          const dateValue = formData[key];
+          if (dateValue) {
+            form.append(key, dateValue.toISOString());
+          }
         } else if (formData[key as keyof TenderFormData] !== undefined && formData[key as keyof TenderFormData] !== null) {
           form.append(key, String(formData[key as keyof TenderFormData]));
         }
       }
-      
+
       const response = await apiClient.post<SingleTenderResponse>('/tenders', form, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       showSuccess('Tender created successfully');
       return response.data.data;
     } catch (error: any) {
@@ -117,7 +125,7 @@ export function useTenders() {
   const updateTender = useCallback(async (id: string, formData: Partial<TenderFormData>) => {
     try {
       setLoading(true);
-      
+
       // Create form data for file upload
       const form = new FormData();
       for (const key in formData) {
@@ -125,19 +133,27 @@ export function useTenders() {
           form.append('documentFile', formData.documentFile as File);
         } else if (key === 'nitDocumentFile' && formData.nitDocumentFile) {
           form.append('nitDocumentFile', formData.nitDocumentFile as File);
+        } else if (key === 'emdDocumentFile' && formData.emdDocumentFile) {
+          form.append('emdDocumentFile', formData.emdDocumentFile as File);
         } else if (key === 'tags' && Array.isArray(formData.tags)) {
           form.append('tags', JSON.stringify(formData.tags));
+        } else if (key === 'emdSubmissionDate' || key === 'emdMaturityDate') {
+          // Handle date fields
+          const dateValue = formData[key];
+          if (dateValue) {
+            form.append(key, dateValue.toISOString());
+          }
         } else if (formData[key as keyof Partial<TenderFormData>] !== undefined && formData[key as keyof Partial<TenderFormData>] !== null) {
           form.append(key, String(formData[key as keyof Partial<TenderFormData>]));
         }
       }
-      
+
       const response = await apiClient.put<SingleTenderResponse>(`/tenders/${id}`, form, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       showSuccess('Tender updated successfully');
       return response.data.data;
     } catch (error: any) {
@@ -177,6 +193,30 @@ export function useTenders() {
     }
   }, [showSuccess, showError]);
 
+  // PATCH /tenders/{id}/emd-return-status - Update EMD return status
+  const updateEMDReturnStatus = useCallback(async (
+    id: string,
+    emdReturnStatus: string,
+    emdReturnDate?: Date,
+    emdReturnAmount?: number
+  ) => {
+    try {
+      setLoading(true);
+      const response = await apiClient.patch<SingleTenderResponse>(`/tenders/${id}/emd-return-status`, {
+        emdReturnStatus,
+        emdReturnDate: emdReturnDate?.toISOString(),
+        emdReturnAmount
+      });
+      showSuccess('EMD return status updated successfully');
+      return response.data.data;
+    } catch (error: any) {
+      showError(error.response?.data?.message || 'Failed to update EMD return status');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [showSuccess, showError]);
+
   return {
     loading,
     getAllTenders,
@@ -184,6 +224,7 @@ export function useTenders() {
     createTender,
     updateTender,
     deleteTender,
-    updateTenderStatus
+    updateTenderStatus,
+    updateEMDReturnStatus
   };
 } 

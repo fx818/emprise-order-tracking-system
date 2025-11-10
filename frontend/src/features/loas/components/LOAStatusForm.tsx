@@ -23,7 +23,17 @@ import { Textarea } from "../../../components/ui/textarea";
 import { useLOAs } from "../hooks/use-loas";
 
 const formSchema = z.object({
-  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "SUPPLY_WORK_COMPLETED", "CHASE_PAYMENT", "CLOSED"]),
+  status: z.enum([
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "SUPPLY_WORK_COMPLETED",
+    "CHASE_PAYMENT",
+    "CLOSED",
+    "SUPPLY_WORK_DELAYED",
+    "APPLICATION_PENDING",
+    "UPLOAD_BILL",
+    "RETRIEVE_EMD_SECURITY"
+  ]),
   reason: z.string().optional(),
 });
 
@@ -80,8 +90,12 @@ export function LOAStatusForm({ loa, onSuccess }: LOAStatusFormProps) {
                 <SelectContent>
                   <SelectItem value="NOT_STARTED">1. Not Started</SelectItem>
                   <SelectItem value="IN_PROGRESS">2. In Progress</SelectItem>
+                  <SelectItem value="SUPPLY_WORK_DELAYED">3. Supply/Work Delayed</SelectItem>
                   <SelectItem value="SUPPLY_WORK_COMPLETED">4. Supply/Work Completed</SelectItem>
+                  <SelectItem value="APPLICATION_PENDING">5. Application Pending</SelectItem>
+                  <SelectItem value="UPLOAD_BILL">6. Upload Bill</SelectItem>
                   <SelectItem value="CHASE_PAYMENT">7. Chase Payment</SelectItem>
+                  <SelectItem value="RETRIEVE_EMD_SECURITY">8. Retrieve EMD/Security</SelectItem>
                   <SelectItem value="CLOSED">9. Closed</SelectItem>
                 </SelectContent>
               </Select>

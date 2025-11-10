@@ -296,6 +296,29 @@ export function loaRoutes(controller: LoaController) {
     controller.deleteAmendment
   );
 
+  // Create other document
+  router.post(
+    '/:loaId/other-documents',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF]),
+    upload.single('documentFile'),
+    controller.createOtherDocument
+  );
+
+  // Update other document
+  router.put(
+    '/other-documents/:id',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF]),
+    upload.single('documentFile'),
+    controller.updateOtherDocument
+  );
+
+  // Delete other document
+  router.delete(
+    '/other-documents/:id',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
+    controller.deleteOtherDocument
+  );
+
   // Update LOA status
   router.put(
     '/:id/status',

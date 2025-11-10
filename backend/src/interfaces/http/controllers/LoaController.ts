@@ -48,13 +48,11 @@ export class LoaController {
 
       // Parse boolean values
       const hasEmd = req.body.hasEmd === 'true' || req.body.hasEmd === true;
-      const hasSecurityDeposit = req.body.hasSecurityDeposit === 'true' || req.body.hasSecurityDeposit === true;
-      const hasPerformanceGuarantee = req.body.hasPerformanceGuarantee === 'true' || req.body.hasPerformanceGuarantee === true;
+      const hasSd = req.body.hasSd === 'true' || req.body.hasSd === true;
+      const hasPg = req.body.hasPg === 'true' || req.body.hasPg === true;
 
       // Parse amount values
       const emdAmount = req.body.emdAmount ? Number(req.body.emdAmount) : undefined;
-      const securityDepositAmount = req.body.securityDepositAmount ? Number(req.body.securityDepositAmount) : undefined;
-      const performanceGuaranteeAmount = req.body.performanceGuaranteeAmount ? Number(req.body.performanceGuaranteeAmount) : undefined;
 
       // Parse invoice/billing amount values
       const invoiceAmount = req.body.invoiceAmount ? Number(req.body.invoiceAmount) : undefined;
@@ -71,15 +69,25 @@ export class LoaController {
         siteId: req.body.siteId,
         tags,
         documentFile,
-        // New fields
+        // Tender fields
+        tenderNo: req.body.tenderNo,
+        tenderId: req.body.tenderId,
+        orderPOC: req.body.orderPOC,
+        pocId: req.body.pocId,
+        inspectionAgencyId: req.body.inspectionAgencyId,
+        fdBgDetails: req.body.fdBgDetails,
+        // Financial fields
         hasEmd,
         emdAmount,
-        hasSecurityDeposit,
-        securityDepositAmount,
-        securityDepositFile,
-        hasPerformanceGuarantee,
-        performanceGuaranteeAmount,
-        performanceGuaranteeFile,
+        hasSd,
+        sdFdrId: req.body.sdFdrId,
+        hasPg,
+        pgFdrId: req.body.pgFdrId,
+        // Warranty fields
+        warrantyPeriodMonths: req.body.warrantyPeriodMonths ? Number(req.body.warrantyPeriodMonths) : undefined,
+        warrantyPeriodYears: req.body.warrantyPeriodYears ? Number(req.body.warrantyPeriodYears) : undefined,
+        warrantyStartDate: req.body.warrantyStartDate,
+        warrantyEndDate: req.body.warrantyEndDate,
         // Billing/Invoice fields
         invoiceNumber: req.body.invoiceNumber,
         invoiceAmount,
@@ -159,20 +167,18 @@ export class LoaController {
       const performanceGuaranteeFile = files?.performanceGuaranteeFile?.[0];
 
       // Parse boolean values if present
-      const hasEmd = req.body.hasEmd !== undefined ? 
-        (req.body.hasEmd === 'true' || req.body.hasEmd === true) : 
+      const hasEmd = req.body.hasEmd !== undefined ?
+        (req.body.hasEmd === 'true' || req.body.hasEmd === true) :
         undefined;
-      const hasSecurityDeposit = req.body.hasSecurityDeposit !== undefined ? 
-        (req.body.hasSecurityDeposit === 'true' || req.body.hasSecurityDeposit === true) : 
+      const hasSd = req.body.hasSd !== undefined ?
+        (req.body.hasSd === 'true' || req.body.hasSd === true) :
         undefined;
-      const hasPerformanceGuarantee = req.body.hasPerformanceGuarantee !== undefined ? 
-        (req.body.hasPerformanceGuarantee === 'true' || req.body.hasPerformanceGuarantee === true) : 
+      const hasPg = req.body.hasPg !== undefined ?
+        (req.body.hasPg === 'true' || req.body.hasPg === true) :
         undefined;
 
       // Parse amount values if present
       const emdAmount = req.body.emdAmount ? Number(req.body.emdAmount) : undefined;
-      const securityDepositAmount = req.body.securityDepositAmount ? Number(req.body.securityDepositAmount) : undefined;
-      const performanceGuaranteeAmount = req.body.performanceGuaranteeAmount ? Number(req.body.performanceGuaranteeAmount) : undefined;
 
       // Parse invoice/billing amount values
       const invoiceAmount = req.body.invoiceAmount ? Number(req.body.invoiceAmount) : undefined;
@@ -189,15 +195,26 @@ export class LoaController {
         siteId: req.body.siteId,
         tags,
         documentFile,
-        // New fields
+        status: req.body.status, // Add status field
+        // Tender fields
+        tenderNo: req.body.tenderNo,
+        tenderId: req.body.tenderId,
+        orderPOC: req.body.orderPOC,
+        pocId: req.body.pocId,
+        inspectionAgencyId: req.body.inspectionAgencyId,
+        fdBgDetails: req.body.fdBgDetails,
+        // Financial fields
         hasEmd,
         emdAmount,
-        hasSecurityDeposit,
-        securityDepositAmount,
-        securityDepositFile,
-        hasPerformanceGuarantee,
-        performanceGuaranteeAmount,
-        performanceGuaranteeFile,
+        hasSd,
+        sdFdrId: req.body.sdFdrId,
+        hasPg,
+        pgFdrId: req.body.pgFdrId,
+        // Warranty fields
+        warrantyPeriodMonths: req.body.warrantyPeriodMonths ? Number(req.body.warrantyPeriodMonths) : undefined,
+        warrantyPeriodYears: req.body.warrantyPeriodYears ? Number(req.body.warrantyPeriodYears) : undefined,
+        warrantyStartDate: req.body.warrantyStartDate,
+        warrantyEndDate: req.body.warrantyEndDate,
         // Billing/Invoice fields
         invoiceNumber: req.body.invoiceNumber,
         invoiceAmount,
@@ -223,7 +240,10 @@ export class LoaController {
         return;
       }
 
-      res.status(200).json(result.data);
+      res.status(200).json({
+        status: 'success',
+        data: result.data
+      });
     } catch (error) {
       next(error);
     }
@@ -276,6 +296,7 @@ export class LoaController {
         search,
         siteId,
         zoneId,
+        tenderId,
         status,
         minValue,
         maxValue,
@@ -292,6 +313,7 @@ export class LoaController {
         limit: limit ? parseInt(limit as string) : undefined,
         siteId: siteId as string,
         zoneId: zoneId as string,
+        tenderId: tenderId as string,
         status: status as string,
         minValue: minValue ? parseFloat(minValue as string) : undefined,
         maxValue: maxValue ? parseFloat(maxValue as string) : undefined,
@@ -372,9 +394,75 @@ export class LoaController {
       const result = await this.service.deleteAmendment(id);
 
       if (!result.isSuccess) {
-        const errorMessage = Array.isArray(result.error) 
+        const errorMessage = Array.isArray(result.error)
           ? result.error[0]?.message || 'Failed to delete amendment'
           : result.error || 'Failed to delete amendment';
+        throw new AppError(errorMessage);
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createOtherDocument = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { loaId } = req.params;
+      const result = await this.service.createOtherDocument(loaId, {
+        ...req.body,
+        documentFile: req.file
+      });
+
+      if (!result.isSuccess) {
+        const errorMessage = Array.isArray(result.error)
+          ? result.error[0]?.message || 'Failed to create other document'
+          : result.error || 'Failed to create other document';
+        throw new AppError(errorMessage);
+      }
+
+      res.status(201).json({
+        status: 'success',
+        data: result.data
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateOtherDocument = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const result = await this.service.updateOtherDocument(id, {
+        ...req.body,
+        documentFile: req.file
+      });
+
+      if (!result.isSuccess) {
+        const errorMessage = Array.isArray(result.error)
+          ? result.error[0]?.message || 'Failed to update other document'
+          : result.error || 'Failed to update other document';
+        throw new AppError(errorMessage);
+      }
+
+      res.json({
+        status: 'success',
+        data: result.data
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteOtherDocument = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const result = await this.service.deleteOtherDocument(id);
+
+      if (!result.isSuccess) {
+        const errorMessage = Array.isArray(result.error)
+          ? result.error[0]?.message || 'Failed to delete other document'
+          : result.error || 'Failed to delete other document';
         throw new AppError(errorMessage);
       }
 

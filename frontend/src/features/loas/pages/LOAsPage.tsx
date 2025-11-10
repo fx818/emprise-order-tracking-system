@@ -50,7 +50,9 @@ function LOAsList() {
           Bulk Import
         </Button>
       </div>
+
       <LOAList key={refreshKey} />
+
       <BulkImportDialog
         open={bulkImportOpen}
         onOpenChange={setBulkImportOpen}
@@ -152,7 +154,7 @@ function EditLOA() {
   const firstInvoice = loa.invoices && loa.invoices.length > 0 ? loa.invoices[0] : null;
 
   const initialFormData = {
-    siteId: loa.siteId,
+    siteId: loa.site?.id || '',
     loaNumber: loa.loaNumber,
     loaValue: loa.loaValue,
     deliveryPeriod: loa.deliveryPeriod,
@@ -162,14 +164,15 @@ function EditLOA() {
     tags: loa.tags || [],
     remarks: loa.remarks || '',
     tenderNo: loa.tenderNo || '',
-    orderPOC: loa.orderPOC || '',
+    tenderId: loa.tenderId || loa.tender?.id || '',
+    pocId: loa.pocId || loa.poc?.id || '',
     fdBgDetails: loa.fdBgDetails || '',
     hasEmd: loa.hasEmd,
     emdAmount: loa.emdAmount,
-    hasSecurityDeposit: loa.hasSecurityDeposit,
-    securityDepositAmount: loa.securityDepositAmount,
-    hasPerformanceGuarantee: loa.hasPerformanceGuarantee,
-    performanceGuaranteeAmount: loa.performanceGuaranteeAmount,
+    hasSd: loa.hasSd,
+    sdFdrId: loa.sdFdrId,
+    hasPg: loa.hasPg,
+    pgFdrId: loa.pgFdrId,
     // Warranty fields
     warrantyPeriodMonths: loa.warrantyPeriodMonths || null,
     warrantyPeriodYears: loa.warrantyPeriodYears || null,
@@ -178,11 +181,12 @@ function EditLOA() {
     // Map invoice fields from the first invoice
     invoiceNumber: firstInvoice?.invoiceNumber || '',
     invoiceAmount: firstInvoice?.invoiceAmount || null,
-    totalReceivables: firstInvoice?.totalReceivables || null,
-    actualAmountReceived: firstInvoice?.actualAmountReceived || null,
-    amountDeducted: firstInvoice?.amountDeducted || null,
-    amountPending: firstInvoice?.amountPending || null,
-    deductionReason: firstInvoice?.deductionReason || '',
+    // LOA-level financial fields
+    totalReceivables: loa.loaValue || null,
+    actualAmountReceived: loa.actualAmountReceived || null,
+    amountDeducted: loa.amountDeducted || null,
+    amountPending: loa.amountPending || null,
+    deductionReason: loa.deductionReason || '',
     billLinks: firstInvoice?.billLinks || '',
   };
 
@@ -200,6 +204,9 @@ function EditLOA() {
         <CardContent className="pt-6">
           <LOAForm
             initialData={initialFormData}
+            initialSiteName={loa.site?.name}
+            existingDocumentUrl={loa.documentUrl}
+            existingInvoicePdfUrl={firstInvoice?.invoicePdfUrl}
             onSubmit={async (data) => {
             try {
               await updateLOA(id!, data);

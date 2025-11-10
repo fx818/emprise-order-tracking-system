@@ -10,21 +10,28 @@ export interface UpdateLoaDto {
     documentFile?: Express.Multer.File;
     tags?: string[];
     siteId?: string;
+    status?: string;
     remarks?: string;
     tenderNo?: string;
+    tenderId?: string;
     orderPOC?: string;
+    pocId?: string;
+    inspectionAgencyId?: string;
     fdBgDetails?: string;
-    // New fields for EMD
+    // EMD fields
     hasEmd?: boolean;
     emdAmount?: number;
-    // New fields for security deposit
-    hasSecurityDeposit?: boolean;
-    securityDepositAmount?: number;
-    securityDepositFile?: Express.Multer.File;
-    // New fields for performance guarantee
-    hasPerformanceGuarantee?: boolean;
-    performanceGuaranteeAmount?: number;
-    performanceGuaranteeFile?: Express.Multer.File;
+    // FDR linking - link/update existing FDR records
+    hasSd?: boolean;
+    sdFdrId?: string | null;
+    hasPg?: boolean;
+    pgFdrId?: string | null;
+    receivablePending?: number;
+    // Warranty fields
+    warrantyPeriodMonths?: number;
+    warrantyPeriodYears?: number;
+    warrantyStartDate?: string;
+    warrantyEndDate?: string;
     // Billing/Invoice fields
     invoiceNumber?: string;
     invoiceAmount?: number;

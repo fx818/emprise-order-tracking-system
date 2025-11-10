@@ -1,4 +1,5 @@
 // src/index.ts
+import 'express-async-errors'; // Must be imported before other imports to handle async errors
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -18,6 +19,10 @@ import { PrismaVendorItemRepository } from './infrastructure/persistence/reposit
 import { PrismaTenderRepository } from './infrastructure/persistence/repositories/PrismaTenderRepository';
 import { PrismaShippingAddressRepository } from './infrastructure/persistence/repositories/PrismaShippingAddressRepository';
 import { PrismaFdrRepository } from './infrastructure/persistence/repositories/PrismaFdrRepository';
+import { PrismaPocRepository } from './infrastructure/persistence/repositories/PrismaPocRepository';
+import { PrismaInspectionAgencyRepository } from './infrastructure/persistence/repositories/PrismaInspectionAgencyRepository';
+import { PrismaBillRepository } from './infrastructure/persistence/repositories/PrismaBillRepository';
+import { PrismaOtherDocumentRepository } from './infrastructure/persistence/repositories/PrismaOtherDocumentRepository';
 
 // Import services
 import { AuthService } from './application/services/AuthService';
@@ -43,6 +48,9 @@ import { TenderService } from './application/services/TenderService';
 import { ShippingAddressService } from './application/services/ShippingAddressService';
 import { FdrService } from './application/services/FdrService';
 import { BulkImportFdrService } from './application/services/BulkImportFdrService';
+import { PocService } from './application/services/PocService';
+import { InspectionAgencyService } from './application/services/InspectionAgencyService';
+import { BillService } from './application/services/BillService';
 // Import controllers
 import { AuthController } from './interfaces/http/controllers/AuthController';
 import { BudgetaryOfferController } from './interfaces/http/controllers/BudgetaryOfferController';
@@ -55,6 +63,9 @@ import { CustomerController } from './interfaces/http/controllers/CustomerContro
 import { TenderController } from './interfaces/http/controllers/TenderController';
 import { ShippingAddressController } from './interfaces/http/controllers/ShippingAddressController';
 import { FdrController } from './interfaces/http/controllers/FdrController';
+import { PocController } from './interfaces/http/controllers/PocController';
+import { InspectionAgencyController } from './interfaces/http/controllers/InspectionAgencyController';
+import { BillController } from './interfaces/http/controllers/BillController';
 
 // Import routes
 import { authRoutes } from './interfaces/http/routes/auth.routes';
@@ -70,12 +81,15 @@ import { customerRoutes } from './interfaces/http/routes/customer.routes';
 import { tenderRoutes } from './interfaces/http/routes/tender.routes';
 import { shippingAddressRoutes } from './interfaces/http/routes/shippingAddress.routes';
 import { fdrRoutes } from './interfaces/http/routes/fdr.routes';
+import { pocRoutes } from './interfaces/http/routes/poc.routes';
+import { inspectionAgencyRoutes } from './interfaces/http/routes/inspection-agency.routes';
+import { billRoutes } from './interfaces/http/routes/bill.routes';
 import { BudgetaryOfferValidator } from './application/validators/budgetaryOffer.validator';
 import { mkdirSync } from 'fs';
 import { unlinkSync, readdirSync, statSync } from 'fs';
 
 // Import error handler
-// import { errorHandler } from './shared/middleware/errorHandler';
+import { errorHandler } from './shared/middlware/errorhandler';
 import path from 'path';
 import { VendorItemService } from './application/services/VendorItemService';
 import { VendorItemController } from './interfaces/http/controllers/VendorItemController';
@@ -96,7 +110,7 @@ async function startServer() {
   app.use(cors({
    origin: ['https://emprise.prossimatech.com', 'https://www.emprise.prossimatech.com', "https://client.prossimatech.com" ,'http://localhost:5173'],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   }));
   
@@ -119,6 +133,10 @@ async function startServer() {
   const tenderRepository = new PrismaTenderRepository(prisma);
   const shippingAddressRepository = new PrismaShippingAddressRepository(prisma);
   const fdrRepository = new PrismaFdrRepository(prisma);
+  const pocRepository = new PrismaPocRepository(prisma);
+  const inspectionAgencyRepository = new PrismaInspectionAgencyRepository(prisma);
+  const billRepository = new PrismaBillRepository(prisma);
+  const otherDocumentRepository = new PrismaOtherDocumentRepository(prisma);
 
   const s3Service = new S3Service({
     region: config.aws.region,
@@ -155,7 +173,7 @@ async function startServer() {
     emailService,
     tokenService
   );
-  const loaService = new LoaService(loaRepository, s3Service);
+  const loaService = new LoaService(loaRepository, tenderRepository, otherDocumentRepository, s3Service);
   const vendorService = new VendorService(vendorRepository);
   const vendorItemService = new VendorItemService(vendorItemRepository);
   const itemService = new ItemService(itemRepository);
@@ -174,11 +192,14 @@ async function startServer() {
   const siteService = new SiteService(siteRepository);
   const userController = new UserController(userService);
   const customerService = new CustomerService(prisma);
-  const tenderService = new TenderService(tenderRepository, s3Service);
+  const tenderService = new TenderService(tenderRepository, loaRepository, s3Service);
   const shippingAddressService = new ShippingAddressService(shippingAddressRepository);
   const bulkImportService = new BulkImportService(prisma);
   const bulkImportFdrService = new BulkImportFdrService(prisma);
   const fdrService = new FdrService(fdrRepository, s3Service, ocrService, config.openRouterApiKey);
+  const pocService = new PocService(pocRepository);
+  const inspectionAgencyService = new InspectionAgencyService(inspectionAgencyRepository);
+  const billService = new BillService(billRepository, s3Service);
 
   // Initialize controllers
   const authController = new AuthController(authService);
@@ -193,6 +214,9 @@ async function startServer() {
   const tenderController = new TenderController(tenderService);
   const shippingAddressController = new ShippingAddressController(shippingAddressService);
   const fdrController = new FdrController(fdrService, bulkImportFdrService);
+  const pocController = new PocController(pocService);
+  const inspectionAgencyController = new InspectionAgencyController(inspectionAgencyService);
+  const billController = new BillController(billService);
 
   // Initialize Dashboard services and controller
   const dashboardService = new DashboardService(prisma);
@@ -275,11 +299,26 @@ async function startServer() {
     fdrRoutes(fdrController)
   );
 
+  app.use(
+    '/api/pocs',
+    pocRoutes(pocController)
+  );
+
+  app.use(
+    '/api/inspection-agencies',
+    inspectionAgencyRoutes(inspectionAgencyController)
+  );
+
+  app.use(
+    '/api',
+    billRoutes(billController)
+  );
+
   // Create uploads directory if it doesn't exist
   mkdirSync('uploads', { recursive: true });
 
-  // Error handling middleware
-  // app.use(errorHandler);
+  // Error handling middleware (must be last)
+  app.use(errorHandler);
 
   // Start the server
   const port = config.port;

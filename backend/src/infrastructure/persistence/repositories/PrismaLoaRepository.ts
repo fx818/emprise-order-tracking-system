@@ -1,16 +1,22 @@
 // infrastructure/persistence/repositories/PrismaLoaRepository.ts
-import { PrismaClient, Prisma, LOA as PrismaLOA, Amendment as PrismaAmendment } from '@prisma/client';
+import { PrismaClient, Prisma, LOA as PrismaLOA, Amendment as PrismaAmendment, OtherDocument as PrismaOtherDocument } from '@prisma/client';
 import { DeliveryPeriod } from '../../../application/dtos/loa/CreateLoaDto';
-import { LOA, Amendment } from '../../../domain/entities/LOA';
+import { LOA, Amendment, OtherDocument } from '../../../domain/entities/LOA';
 
 export class PrismaLoaRepository {
   constructor(private prisma: PrismaClient) {}
 
   private mapPrismaLoaToLoa(prismaLoa: PrismaLOA & {
     amendments: PrismaAmendment[];
+    otherDocuments?: PrismaOtherDocument[];
     purchaseOrders: any[]; // Replace 'any' with your PO type
     invoices?: any[];
     site?: any;
+    tender?: any;
+    poc?: any;
+    inspectionAgency?: any;
+    sdFdr?: any;
+    pgFdr?: any;
   }): LOA {
     // Don't parse the deliveryPeriod as it's already an object
     return {
@@ -30,6 +36,16 @@ export class PrismaLoaRepository {
       remarks: prismaLoa.remarks || undefined,
       tenderNo: prismaLoa.tenderNo || undefined,
       orderPOC: prismaLoa.orderPOC || undefined,
+      pocId: prismaLoa.pocId || undefined,
+      poc: prismaLoa.poc ? {
+        id: prismaLoa.poc.id,
+        name: prismaLoa.poc.name
+      } : undefined,
+      inspectionAgencyId: prismaLoa.inspectionAgencyId || undefined,
+      inspectionAgency: prismaLoa.inspectionAgency ? {
+        id: prismaLoa.inspectionAgency.id,
+        name: prismaLoa.inspectionAgency.name
+      } : undefined,
       fdBgDetails: prismaLoa.fdBgDetails || undefined,
       amendments: prismaLoa.amendments.map(amendment => ({
         id: amendment.id,
@@ -41,22 +57,51 @@ export class PrismaLoaRepository {
         loaId: amendment.loaId
       })),
       invoices: prismaLoa.invoices || [],
-      site: {
+      otherDocuments: prismaLoa.otherDocuments?.map(doc => ({
+        id: doc.id,
+        title: doc.title,
+        documentUrl: doc.documentUrl,
+        loaId: doc.loaId,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt
+      })) || [],
+      site: prismaLoa.site ? {
         id: prismaLoa.site.id,
         name: prismaLoa.site.name,
         code: prismaLoa.site.code,
         zoneId: prismaLoa.site.zoneId,
-      },
+        zone: prismaLoa.site.zone ? {
+          id: prismaLoa.site.zone.id,
+          name: prismaLoa.site.zone.name,
+          headquarters: prismaLoa.site.zone.headquarters,
+        } : undefined,
+      } : undefined,
       siteId: prismaLoa.siteId || '',
       purchaseOrders: prismaLoa.purchaseOrders,
       hasEmd: prismaLoa.hasEmd,
       emdAmount: prismaLoa.emdAmount || undefined,
-      hasSecurityDeposit: prismaLoa.hasSecurityDeposit,
-      securityDepositAmount: prismaLoa.securityDepositAmount || undefined,
-      securityDepositDocumentUrl: prismaLoa.securityDepositDocumentUrl || undefined,
-      hasPerformanceGuarantee: prismaLoa.hasPerformanceGuarantee,
-      performanceGuaranteeAmount: prismaLoa.performanceGuaranteeAmount || undefined,
-      performanceGuaranteeDocumentUrl: prismaLoa.performanceGuaranteeDocumentUrl || undefined,
+      hasSd: prismaLoa.hasSd,
+      sdFdrId: prismaLoa.sdFdrId || undefined,
+      hasPg: prismaLoa.hasPg,
+      pgFdrId: prismaLoa.pgFdrId || undefined,
+      sdFdr: prismaLoa.sdFdr ? {
+        id: prismaLoa.sdFdr.id,
+        bankName: prismaLoa.sdFdr.bankName,
+        depositAmount: prismaLoa.sdFdr.depositAmount,
+        dateOfDeposit: prismaLoa.sdFdr.dateOfDeposit,
+        maturityDate: prismaLoa.sdFdr.maturityDate || undefined,
+        status: prismaLoa.sdFdr.status,
+        category: prismaLoa.sdFdr.category
+      } : undefined,
+      pgFdr: prismaLoa.pgFdr ? {
+        id: prismaLoa.pgFdr.id,
+        bankName: prismaLoa.pgFdr.bankName,
+        depositAmount: prismaLoa.pgFdr.depositAmount,
+        dateOfDeposit: prismaLoa.pgFdr.dateOfDeposit,
+        maturityDate: prismaLoa.pgFdr.maturityDate || undefined,
+        status: prismaLoa.pgFdr.status,
+        category: prismaLoa.pgFdr.category
+      } : undefined,
       createdAt: prismaLoa.createdAt,
       updatedAt: prismaLoa.updatedAt
     };
@@ -90,16 +135,27 @@ export class PrismaLoaRepository {
     siteId: string;
     remarks?: string;
     tenderNo?: string;
+    tenderId?: string;
     orderPOC?: string;
+    pocId?: string;
+    inspectionAgencyId?: string;
     fdBgDetails?: string;
     hasEmd?: boolean;
     emdAmount?: number;
-    hasSecurityDeposit?: boolean;
-    securityDepositAmount?: number;
-    securityDepositDocumentUrl?: string;
-    hasPerformanceGuarantee?: boolean;
-    performanceGuaranteeAmount?: number;
-    performanceGuaranteeDocumentUrl?: string;
+    hasSd?: boolean;
+    sdFdrId?: string;
+    hasPg?: boolean;
+    pgFdrId?: string;
+    warrantyPeriodMonths?: number;
+    warrantyPeriodYears?: number;
+    warrantyStartDate?: Date;
+    warrantyEndDate?: Date;
+    dueDate?: Date;
+    orderReceivedDate?: Date;
+    actualAmountReceived?: number;
+    amountDeducted?: number;
+    amountPending?: number;
+    deductionReason?: string;
   }): Promise<LOA> {
     try {
       const prismaLoa = await this.prisma.lOA.create({
@@ -113,26 +169,39 @@ export class PrismaLoaRepository {
           workDescription: data.workDescription,
           documentUrl: data.documentUrl,
           tags: data.tags,
-          site: {
-            connect: { id: data.siteId }
-          },
+          siteId: data.siteId,
+          tenderId: data.tenderId || null,
           remarks: data.remarks || null,
           tenderNo: data.tenderNo || null,
           orderPOC: data.orderPOC || null,
+          pocId: data.pocId || null,
+          inspectionAgencyId: data.inspectionAgencyId || null,
           fdBgDetails: data.fdBgDetails || null,
           hasEmd: data.hasEmd || false,
           emdAmount: data.emdAmount || null,
-          hasSecurityDeposit: data.hasSecurityDeposit || false,
-          securityDepositAmount: data.securityDepositAmount || null,
-          securityDepositDocumentUrl: data.securityDepositDocumentUrl || null,
-          hasPerformanceGuarantee: data.hasPerformanceGuarantee || false,
-          performanceGuaranteeAmount: data.performanceGuaranteeAmount || null,
-          performanceGuaranteeDocumentUrl: data.performanceGuaranteeDocumentUrl || null
+          hasSd: data.hasSd || false,
+          sdFdrId: data.sdFdrId || null,
+          hasPg: data.hasPg || false,
+          pgFdrId: data.pgFdrId || null,
+          actualAmountReceived: data.actualAmountReceived || null,
+          amountDeducted: data.amountDeducted || null,
+          amountPending: data.amountPending || null,
+          deductionReason: data.deductionReason || null
         },
         include: {
           amendments: true,
           purchaseOrders: true,
-          site: true
+          invoices: true,
+          site: {
+            include: {
+              zone: true
+            }
+          },
+          tender: true,
+          poc: true,
+          inspectionAgency: true,
+          sdFdr: true,
+          pgFdr: true
         }
       });
 
@@ -168,21 +237,20 @@ export class PrismaLoaRepository {
     // Handle optional EDM fields
     if (data.hasEmd !== undefined) updateData.hasEmd = data.hasEmd;
     if (data.emdAmount !== undefined) updateData.emdAmount = data.emdAmount;
-    
-    // Handle optional security deposit fields
-    if (data.hasSecurityDeposit !== undefined) updateData.hasSecurityDeposit = data.hasSecurityDeposit;
-    if (data.securityDepositAmount !== undefined) updateData.securityDepositAmount = data.securityDepositAmount;
-    if (data.securityDepositDocumentUrl !== undefined) updateData.securityDepositDocumentUrl = data.securityDepositDocumentUrl;
-    
-    // Handle optional performance guarantee fields
-    if (data.hasPerformanceGuarantee !== undefined) updateData.hasPerformanceGuarantee = data.hasPerformanceGuarantee;
-    if (data.performanceGuaranteeAmount !== undefined) updateData.performanceGuaranteeAmount = data.performanceGuaranteeAmount;
-    if (data.performanceGuaranteeDocumentUrl !== undefined) updateData.performanceGuaranteeDocumentUrl = data.performanceGuaranteeDocumentUrl;
 
     // Handle optional LOA fields
     if (data.remarks !== undefined) updateData.remarks = data.remarks;
     if (data.tenderNo !== undefined) updateData.tenderNo = data.tenderNo;
+    if (data.tenderId !== undefined) {
+      updateData.tender = data.tenderId ? { connect: { id: data.tenderId } } : { disconnect: true };
+    }
     if (data.orderPOC !== undefined) updateData.orderPOC = data.orderPOC;
+    if (data.pocId !== undefined) {
+      updateData.poc = data.pocId ? { connect: { id: data.pocId } } : { disconnect: true };
+    }
+    if (data.inspectionAgencyId !== undefined) {
+      updateData.inspectionAgency = data.inspectionAgencyId ? { connect: { id: data.inspectionAgencyId } } : { disconnect: true };
+    }
     if (data.fdBgDetails !== undefined) updateData.fdBgDetails = data.fdBgDetails;
 
     try {
@@ -192,7 +260,17 @@ export class PrismaLoaRepository {
         include: {
           amendments: true,
           purchaseOrders: true,
-          site: true
+          invoices: true,
+          site: {
+            include: {
+              zone: true
+            }
+          },
+          tender: true,
+          poc: true,
+          inspectionAgency: true,
+          sdFdr: true,
+          pgFdr: true
         }
       });
 
@@ -208,7 +286,9 @@ export class PrismaLoaRepository {
       where: { id },
       include: {
         amendments: true,
-        purchaseOrders: true
+        purchaseOrders: true,
+        poc: true,
+        inspectionAgency: true
       }
     });
 
@@ -220,9 +300,19 @@ export class PrismaLoaRepository {
       where: { id },
       include: {
         amendments: true,
+        otherDocuments: true,
         purchaseOrders: true,
         invoices: true,
-        site: true
+        site: {
+          include: {
+            zone: true
+          }
+        },
+        tender: true,
+        poc: true,
+        inspectionAgency: true,
+        sdFdr: true,
+        pgFdr: true
       }
     });
 
@@ -234,8 +324,18 @@ export class PrismaLoaRepository {
       where: { loaNumber },
       include: {
         amendments: true,
+        otherDocuments: true,
         purchaseOrders: true,
-        site: true
+        site: {
+          include: {
+            zone: true
+          }
+        },
+        tender: true,
+        poc: true,
+        inspectionAgency: true,
+        sdFdr: true,
+        pgFdr: true
       }
     });
 
@@ -248,6 +348,7 @@ export class PrismaLoaRepository {
     searchTerm?: string;
     siteId?: string;
     zoneId?: string;
+    tenderId?: string;
     status?: string;
     minValue?: number;
     maxValue?: number;
@@ -271,6 +372,9 @@ export class PrismaLoaRepository {
         case 'deliveryEndDate':
           orderBy = { deliveryPeriod: { end: params.sortOrder } };
           break;
+        case 'dueDate':
+          orderBy = { dueDate: params.sortOrder };
+          break;
         case 'createdAt':
           orderBy = { createdAt: params.sortOrder };
           break;
@@ -290,8 +394,18 @@ export class PrismaLoaRepository {
       whereConditions.push({ site: { zoneId: params.zoneId } });
     }
 
+    if (params.tenderId) {
+      whereConditions.push({ tenderId: params.tenderId });
+    }
+
     if (params.status) {
-      whereConditions.push({ status: params.status });
+      if (params.status === 'ACTIVE') {
+        // 'ACTIVE' means exclude CLOSED status
+        whereConditions.push({ status: { not: 'CLOSED' } });
+      } else {
+        // Direct status match (e.g., 'CLOSED', 'IN_PROGRESS', etc.)
+        whereConditions.push({ status: params.status });
+      }
     }
 
     if (params.minValue !== undefined || params.maxValue !== undefined) {
@@ -339,9 +453,18 @@ export class PrismaLoaRepository {
       where: whereConditions.length > 0 ? { AND: whereConditions } : {},
       include: {
         amendments: true,
+        otherDocuments: true,
         purchaseOrders: true,
         invoices: true,
-        site: true
+        site: {
+          include: {
+            zone: true  // Include customer/zone data
+          }
+        },
+        tender: true,  // Include tender data
+        poc: true,  // Include POC data
+        sdFdr: true,  // Include Security Deposit FDR
+        pgFdr: true  // Include Performance Guarantee FDR
       },
       orderBy
     });
@@ -353,6 +476,7 @@ export class PrismaLoaRepository {
     searchTerm?: string;
     siteId?: string;
     zoneId?: string;
+    tenderId?: string;
     status?: string;
     minValue?: number;
     maxValue?: number;
@@ -371,8 +495,18 @@ export class PrismaLoaRepository {
       whereConditions.push({ site: { zoneId: params.zoneId } });
     }
 
+    if (params.tenderId) {
+      whereConditions.push({ tenderId: params.tenderId });
+    }
+
     if (params.status) {
-      whereConditions.push({ status: params.status });
+      if (params.status === 'ACTIVE') {
+        // 'ACTIVE' means exclude CLOSED status
+        whereConditions.push({ status: { not: 'CLOSED' } });
+      } else {
+        // Direct status match (e.g., 'CLOSED', 'IN_PROGRESS', etc.)
+        whereConditions.push({ status: params.status });
+      }
     }
 
     if (params.minValue !== undefined || params.maxValue !== undefined) {
@@ -432,7 +566,11 @@ export class PrismaLoaRepository {
           include: {
             amendments: true,
             purchaseOrders: true,
-            site: true
+            site: {
+          include: {
+            zone: true
+          }
+        }
           }
         }
       }
@@ -456,7 +594,11 @@ export class PrismaLoaRepository {
           include: {
             amendments: true,
             purchaseOrders: true,
-            site: true
+            site: {
+          include: {
+            zone: true
+          }
+        }
           }
         }
       }
@@ -473,7 +615,11 @@ export class PrismaLoaRepository {
           include: {
             amendments: true,
             purchaseOrders: true,
-            site: true
+            site: {
+          include: {
+            zone: true
+          }
+        }
           }
         }
       }
@@ -490,7 +636,11 @@ export class PrismaLoaRepository {
           include: {
             amendments: true,
             purchaseOrders: true,
-            site: true
+            site: {
+          include: {
+            zone: true
+          }
+        }
           }
         }
       }
@@ -506,14 +656,10 @@ export class PrismaLoaRepository {
     loaId: string;
     invoiceNumber?: string;
     invoiceAmount?: number;
-    totalReceivables?: number;
-    actualAmountReceived?: number;
-    amountDeducted?: number;
-    amountPending?: number;
-    deductionReason?: string;
     billLinks?: string;
     invoicePdfUrl?: string;
     remarks?: string;
+    status?: 'REGISTERED' | 'RETURNED' | 'PAYMENT_MADE';
   }): Promise<any> {
     try {
       const invoice = await this.prisma.invoice.create({
@@ -521,14 +667,10 @@ export class PrismaLoaRepository {
           loaId: data.loaId,
           invoiceNumber: data.invoiceNumber,
           invoiceAmount: data.invoiceAmount,
-          totalReceivables: data.totalReceivables,
-          actualAmountReceived: data.actualAmountReceived,
-          amountDeducted: data.amountDeducted,
-          amountPending: data.amountPending,
-          deductionReason: data.deductionReason,
           billLinks: data.billLinks,
           invoicePdfUrl: data.invoicePdfUrl,
           remarks: data.remarks,
+          status: data.status || 'REGISTERED',
         }
       });
       return invoice;
@@ -559,14 +701,10 @@ export class PrismaLoaRepository {
   async updateInvoice(id: string, data: {
     invoiceNumber?: string;
     invoiceAmount?: number;
-    totalReceivables?: number;
-    actualAmountReceived?: number;
-    amountDeducted?: number;
-    amountPending?: number;
-    deductionReason?: string;
     billLinks?: string;
     invoicePdfUrl?: string;
     remarks?: string;
+    status?: 'REGISTERED' | 'RETURNED' | 'PAYMENT_MADE';
   }): Promise<any> {
     try {
       const invoice = await this.prisma.invoice.update({
@@ -574,14 +712,10 @@ export class PrismaLoaRepository {
         data: {
           invoiceNumber: data.invoiceNumber,
           invoiceAmount: data.invoiceAmount,
-          totalReceivables: data.totalReceivables,
-          actualAmountReceived: data.actualAmountReceived,
-          amountDeducted: data.amountDeducted,
-          amountPending: data.amountPending,
-          deductionReason: data.deductionReason,
           billLinks: data.billLinks,
           invoicePdfUrl: data.invoicePdfUrl,
           remarks: data.remarks,
+          status: data.status,
         }
       });
       return invoice;

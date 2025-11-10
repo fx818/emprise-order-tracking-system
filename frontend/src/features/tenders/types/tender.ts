@@ -6,14 +6,21 @@ export const tenderSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   hasEMD: z.boolean().default(false),
   emdAmount: z.number().min(0, 'EMD amount must be positive').optional().nullable(),
+  emdBankName: z.string().optional(),
+  emdSubmissionDate: z.date().optional(),
+  emdMaturityDate: z.date().optional(),
   tags: z.array(z.string()).default([]),
-  documentFile: z.any().optional(), // We'll handle file validation separately
-  nitDocumentFile: z.any().optional() // We'll handle file validation separately
+  documentFile: z.any().optional(),
+  nitDocumentFile: z.any().optional(),
+  emdDocumentFile: z.any().optional(),
+  siteId: z.string().optional()
 });
 
 export type TenderFormData = z.infer<typeof tenderSchema>;
 
 export type TenderStatus = 'ACTIVE' | 'RETENDERED' | 'CANCELLED' | 'AWARDED' | 'NOT_AWARDED';
+
+export type EMDReturnStatus = 'PENDING' | 'RELEASED' | 'RETAINED_AS_SD';
 
 export interface Tender {
   id: string;
@@ -22,10 +29,27 @@ export interface Tender {
   description: string;
   hasEMD: boolean;
   emdAmount?: number | null;
+  emdBankName?: string | null;
+  emdSubmissionDate?: string | null;
+  emdMaturityDate?: string | null;
+  emdDocumentUrl?: string | null;
+  emdReturnStatus?: EMDReturnStatus | null;
+  emdReturnDate?: string | null;
+  emdReturnAmount?: number | null;
   status: TenderStatus;
   documentUrl?: string;
   nitDocumentUrl?: string;
   tags: string[];
+  siteId?: string | null;
+  site?: {
+    id: string;
+    name: string;
+    code: string;
+    zone?: {
+      id: string;
+      name: string;
+    };
+  };
   createdAt: string;
   updatedAt: string;
 }

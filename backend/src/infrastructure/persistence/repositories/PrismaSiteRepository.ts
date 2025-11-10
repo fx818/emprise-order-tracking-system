@@ -15,6 +15,11 @@ export class PrismaSiteRepository {
       code: prismaSite.code,
       location: prismaSite.location,
       zoneId: prismaSite.zoneId,
+      zone: prismaSite.zone ? {
+        id: prismaSite.zone.id,
+        name: prismaSite.zone.name,
+        headquarters: prismaSite.zone.headquarters,
+      } : undefined,
       address: prismaSite.address,
       contactPerson: prismaSite.contactPerson,
       contactPhone: prismaSite.contactPhone,
@@ -98,6 +103,7 @@ export class PrismaSiteRepository {
     const prismaSite = await this.prisma.site.findUnique({
       where: { id },
       include: {
+        zone: true,  // Include customer/zone data
         loas: {
           include: {
             purchaseOrders: true
@@ -147,6 +153,7 @@ export class PrismaSiteRepository {
           ]
         },
         include: {
+          zone: true,  // Include customer/zone data
           loas: {
             include: {
               purchaseOrders: true

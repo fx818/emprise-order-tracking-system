@@ -1,10 +1,13 @@
 // types/site.ts
+import type { Customer } from '../../customers/hooks/use-customers';
+
 export interface Site {
     id: string;
     name: string;
     code: string;
     location: string;
     zoneId: string;
+    zone?: Customer;  // Customer/Zone information
     address: string;
     contactPerson: string | null;
     contactPhone: string | null;

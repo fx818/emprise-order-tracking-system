@@ -29,6 +29,7 @@ export function useLOAs() {
     search?: string;
     siteId?: string;
     zoneId?: string;
+    tenderId?: string;
     status?: string;
     minValue?: number;
     maxValue?: number;
@@ -47,6 +48,7 @@ export function useLOAs() {
       if (params?.search) queryParams.append('search', params.search);
       if (params?.siteId) queryParams.append('siteId', params.siteId);
       if (params?.zoneId) queryParams.append('zoneId', params.zoneId);
+      if (params?.tenderId) queryParams.append('tenderId', params.tenderId);
       if (params?.status) queryParams.append('status', params.status);
       if (params?.minValue !== undefined) queryParams.append('minValue', params.minValue.toString());
       if (params?.maxValue !== undefined) queryParams.append('maxValue', params.maxValue.toString());
@@ -118,9 +120,9 @@ export function useLOAs() {
       Object.entries(data).forEach(([key, value]) => {
         if (key === 'documentFile' && value) {
           formData.append(key, value);
-        } else if (key === 'securityDepositFile' && value && data.hasSecurityDeposit) {
+        } else if (key === 'securityDepositFile' && value && data.hasSd) {
           formData.append(key, value);
-        } else if (key === 'performanceGuaranteeFile' && value && data.hasPerformanceGuarantee) {
+        } else if (key === 'performanceGuaranteeFile' && value && data.hasPg) {
           formData.append(key, value);
         } else if (key === 'invoicePdfFile' && value) {
           formData.append(key, value);
@@ -131,13 +133,13 @@ export function useLOAs() {
             .map((tag: any) => tag.trim())
             .filter(Boolean);
           formData.append(key, JSON.stringify(uniqueTags));
-        } else if (key === 'hasEmd' || key === 'hasSecurityDeposit' || key === 'hasPerformanceGuarantee') {
+        } else if (key === 'hasEmd' || key === 'hasSd' || key === 'hasPg') {
           formData.append(key, String(value));
         } else if (key === 'emdAmount' && data.hasEmd) {
           formData.append(key, String(value || 0));
-        } else if (key === 'securityDepositAmount' && data.hasSecurityDeposit) {
+        } else if (key === 'securityDepositAmount' && data.hasSd) {
           formData.append(key, String(value || 0));
-        } else if (key === 'performanceGuaranteeAmount' && data.hasPerformanceGuarantee) {
+        } else if (key === 'performanceGuaranteeAmount' && data.hasPg) {
           formData.append(key, String(value || 0));
         } else if (key === 'invoiceAmount' || key === 'totalReceivables' || key === 'actualAmountReceived' ||
                    key === 'amountDeducted' || key === 'amountPending') {
@@ -225,7 +227,7 @@ export function useLOAs() {
     }
   };
 
-  const updateLOA = async (id: string, data: LOAFormData) => {
+  const updateLOA = async (id: string, data: Partial<LOAFormData> & { status?: string }) => {
     try {
       setLoading(true);
 
@@ -233,9 +235,9 @@ export function useLOAs() {
       Object.entries(data).forEach(([key, value]) => {
         if (key === 'documentFile' && value) {
           formData.append(key, value);
-        } else if (key === 'securityDepositFile' && value && data.hasSecurityDeposit) {
+        } else if (key === 'securityDepositFile' && value && data.hasSd) {
           formData.append(key, value);
-        } else if (key === 'performanceGuaranteeFile' && value && data.hasPerformanceGuarantee) {
+        } else if (key === 'performanceGuaranteeFile' && value && data.hasPg) {
           formData.append(key, value);
         } else if (key === 'invoicePdfFile' && value) {
           formData.append(key, value);
@@ -251,13 +253,13 @@ export function useLOAs() {
             tagsToSend = value.filter(tag => tag && tag.trim()).map(tag => tag.trim());
           }
           formData.append(key, JSON.stringify(tagsToSend));
-        } else if (key === 'hasEmd' || key === 'hasSecurityDeposit' || key === 'hasPerformanceGuarantee') {
+        } else if (key === 'hasEmd' || key === 'hasSd' || key === 'hasPg') {
           formData.append(key, String(value));
         } else if (key === 'emdAmount' && data.hasEmd) {
           formData.append(key, String(value || 0));
-        } else if (key === 'securityDepositAmount' && data.hasSecurityDeposit) {
+        } else if (key === 'securityDepositAmount' && data.hasSd) {
           formData.append(key, String(value || 0));
-        } else if (key === 'performanceGuaranteeAmount' && data.hasPerformanceGuarantee) {
+        } else if (key === 'performanceGuaranteeAmount' && data.hasPg) {
           formData.append(key, String(value || 0));
         } else if (key === 'invoiceAmount' || key === 'totalReceivables' || key === 'actualAmountReceived' ||
                    key === 'amountDeducted' || key === 'amountPending') {
@@ -280,6 +282,7 @@ export function useLOAs() {
       return response.data.data;
     } catch (error: any) {
       handleError(error, 'Failed to update LOA');
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -354,15 +357,97 @@ export function useLOAs() {
     }
   };
 
+  // Get LOAs by tender ID
+  const getLoasByTender = async (tenderId: string) => {
+    try {
+      setLoading(true);
+      const result = await getLOAs({ tenderId, limit: 1000 }); // Get all LOAs for the tender
+      return result.loas;
+    } catch (error: any) {
+      console.error('Error in getLoasByTender:', error);
+      // Silently return empty array - don't show error toast
+      // This handles cases where tender exists but has no LOAs
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create other document
+  const createOtherDocument = async (loaId: string, data: { title: string; documentFile: File }) => {
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      formData.append('title', data.title);
+      formData.append('documentFile', data.documentFile);
+
+      const response = await apiClient.post(`/loas/${loaId}/other-documents`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      showSuccess('Other document uploaded successfully');
+      return response.data.data;
+    } catch (error: any) {
+      handleError(error, 'Failed to upload other document');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update other document
+  const updateOtherDocument = async (id: string, data: { title?: string; documentFile?: File }) => {
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      if (data.title) formData.append('title', data.title);
+      if (data.documentFile) formData.append('documentFile', data.documentFile);
+
+      const response = await apiClient.put(`/loas/other-documents/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      showSuccess('Other document updated successfully');
+      return response.data.data;
+    } catch (error: any) {
+      handleError(error, 'Failed to update other document');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete other document
+  const deleteOtherDocument = async (id: string) => {
+    try {
+      setLoading(true);
+      await apiClient.delete(`/loas/other-documents/${id}`);
+      showSuccess('Other document deleted successfully');
+    } catch (error: any) {
+      handleError(error, 'Failed to delete other document');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     getLOAs,
     getLOAById,
+    getLoasByTender,
     createLOA,
     updateLOA,
     deleteLOA,
     createAmendment,
     deleteAmendment,
+    createOtherDocument,
+    updateOtherDocument,
+    deleteOtherDocument,
     updateLOAStatus,
     getAvailableEMDs,
     bulkImportLOAs,

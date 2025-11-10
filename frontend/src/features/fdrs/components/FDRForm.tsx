@@ -1,5 +1,5 @@
 import { useForm } from '../../../hooks/use-form';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from "../../../components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../../../components/ui/form";
 import { Input } from "../../../components/ui/input";
@@ -14,10 +14,8 @@ import { format } from 'date-fns';
 import { LoadingSpinner } from '../../../components/feedback/LoadingSpinner';
 import { extractFDRData } from './fdr-extracter';
 import { parseISO } from 'date-fns';
-import { useTenders } from '../../tenders/hooks/use-tenders';
-import { Check, ChevronsUpDown, X, Loader2 } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { Badge } from "../../../components/ui/badge";
-import { Tender } from '../../tenders/types/tender';
 
 interface FDRFormProps {
   initialData?: Partial<FDRFormData>;
@@ -28,33 +26,7 @@ interface FDRFormProps {
 export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
   const [extracting, setExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [openTenderSelect, setOpenTenderSelect] = useState(false);
-  const [tenders, setTenders] = useState<Tender[]>([]);
-  const [loadingTenders, setLoadingTenders] = useState(false);
-  const { getAllTenders } = useTenders();
   const [newTag, setNewTag] = useState('');
-
-  // Fetch tenders when component mounts
-  useEffect(() => {
-    const fetchTenders = async () => {
-      try {
-        setLoadingTenders(true);
-        const fetchedTenders = await getAllTenders();
-        const availableTenders = Array.isArray(fetchedTenders)
-          ? fetchedTenders.filter(t => t.hasEMD)
-          : [];
-        setTenders(availableTenders);
-      } catch (error) {
-        console.error('Error fetching tenders:', error);
-        setTenders([]);
-      } finally {
-        setLoadingTenders(false);
-      }
-    };
-
-    fetchTenders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const form = useForm<FDRFormData>({
     schema: fdrSchema,
@@ -72,10 +44,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
       contractDetails: initialData?.contractDetails || '',
       poc: initialData?.poc || '',
       location: initialData?.location || '',
-      emdAmount: initialData?.emdAmount,
-      sdAmount: initialData?.sdAmount,
       status: initialData?.status,
-      tenderId: initialData?.tenderId,
       tags: initialData?.tags || ['FD'],
     },
   });
@@ -241,6 +210,8 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
+                  <SelectItem value="SD">Security Deposit (SD)</SelectItem>
+                  <SelectItem value="PG">Performance Guarantee (PG)</SelectItem>
                   <SelectItem value="FD">Fixed Deposit (FD)</SelectItem>
                   <SelectItem value="BG">Bank Guarantee (BG)</SelectItem>
                 </SelectContent>
@@ -513,69 +484,6 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           )}
         />
 
-        {/* EMD and SD Amounts */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="emdAmount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>EMD Amount</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2">₹</span>
-                    <Input
-                      type="text"
-                      placeholder="If used as EMD"
-                      {...field}
-                      className="pl-7"
-                      value={field.value ? field.value.toLocaleString('en-IN') : ''}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/,/g, '');
-                        const numValue = Number(value);
-                        if (!isNaN(numValue)) {
-                          field.onChange(numValue);
-                        }
-                      }}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="sdAmount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Security Deposit (SD) Amount</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2">₹</span>
-                    <Input
-                      type="text"
-                      placeholder="If used as SD"
-                      {...field}
-                      className="pl-7"
-                      value={field.value ? field.value.toLocaleString('en-IN') : ''}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/,/g, '');
-                        const numValue = Number(value);
-                        if (!isNaN(numValue)) {
-                          field.onChange(numValue);
-                        }
-                      }}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
         {/* Status */}
         <FormField
           control={form.control}
@@ -596,107 +504,6 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
                   <SelectItem value="RETURNED">Returned</SelectItem>
                 </SelectContent>
               </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Tender Selection */}
-        <FormField
-          control={form.control}
-          name="tenderId"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Associated Tender (Optional)</FormLabel>
-              <Popover
-                open={openTenderSelect}
-                onOpenChange={setOpenTenderSelect}
-              >
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={openTenderSelect}
-                      className={cn(
-                        "w-full justify-between",
-                        !field.value && "text-muted-foreground"
-                      )}
-                      disabled={loadingTenders}
-                    >
-                      {loadingTenders ? (
-                        "Loading tenders..."
-                      ) : field.value ? (
-                        tenders.find((tender) => tender.id === field.value)?.tenderNumber || "Select a tender"
-                      ) : (
-                        "Select a tender"
-                      )}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                {openTenderSelect && (
-                  <PopoverContent className="w-[400px] p-0" align="start">
-                    <div className="w-full">
-                      <div className="border-b px-3 py-2">
-                        <input
-                          className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
-                          placeholder="Search tenders..."
-                          onChange={(e) => {
-                            const searchTerm = e.target.value.toLowerCase();
-                            setTenders(tenders.filter(tender =>
-                              tender.tenderNumber.toLowerCase().includes(searchTerm) ||
-                              tender.description.toLowerCase().includes(searchTerm)
-                            ));
-                          }}
-                        />
-                      </div>
-                      <div className="max-h-[300px] overflow-auto">
-                        {loadingTenders ? (
-                          <div className="p-4 text-center text-sm text-muted-foreground">
-                            Loading tenders...
-                          </div>
-                        ) : tenders.length === 0 ? (
-                          <div className="p-4 text-center text-sm text-muted-foreground">
-                            No tenders with EMD requirement available
-                          </div>
-                        ) : (
-                          tenders.map((tender) => (
-                            <div
-                              key={tender.id}
-                              className={cn(
-                                "flex items-center px-3 py-2 cursor-pointer hover:bg-secondary",
-                                field.value === tender.id && "bg-secondary"
-                              )}
-                              onClick={() => {
-                                form.setValue("tenderId", tender.id);
-                                setOpenTenderSelect(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  field.value === tender.id
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              <div>
-                                <div className="text-sm font-medium">
-                                  {tender.tenderNumber}
-                                </div>
-                                <div className="text-xs text-muted-foreground line-clamp-1">
-                                  {tender.description}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </PopoverContent>
-                )}
-              </Popover>
               <FormMessage />
             </FormItem>
           )}

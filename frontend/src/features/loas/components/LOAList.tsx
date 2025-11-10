@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import {
   MoreHorizontal,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -52,23 +53,27 @@ const statusOptions = [
   { label: "All Status", value: "ALL" },
   { label: "1. Not Started", value: "NOT_STARTED" },
   { label: "2. In Progress", value: "IN_PROGRESS" },
+  { label: "3. Supply/Work Delayed", value: "SUPPLY_WORK_DELAYED" },
   { label: "4. Supply/Work Completed", value: "SUPPLY_WORK_COMPLETED" },
+  { label: "5. Application Pending", value: "APPLICATION_PENDING" },
+  { label: "6. Upload Bill", value: "UPLOAD_BILL" },
   { label: "7. Chase Payment", value: "CHASE_PAYMENT" },
+  { label: "8. Retrieve EMD/Security", value: "RETRIEVE_EMD_SECURITY" },
   { label: "9. Closed", value: "CLOSED" },
 ];
 
-export function LOAList() {
+interface LOAListProps {
+  // No props needed anymore
+}
+
+export function LOAList(_props: LOAListProps = {}) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [minValue, setMinValue] = useState<string>("");
-  const [maxValue, setMaxValue] = useState<string>("");
-  const [hasEMD, setHasEMD] = useState<string>("all");
-  const [hasSecurity, setHasSecurity] = useState<string>("all");
-  const [hasPerformanceGuarantee, setHasPerformanceGuarantee] = useState<string>("all");
+  const [loaTypeFilter, setLoaTypeFilter] = useState<string>("active"); // active, completed, overdue
 
   const [loas, setLOAs] = useState<LOA[]>([]);
-  const { loading, getLOAs, deleteLOA } = useLOAs();
+  const { loading, getLOAs, deleteLOA, updateLOA } = useLOAs();
   const [error, setError] = useState<string | null>(null);
   const [loaToDelete, setLoaToDelete] = useState<LOA | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -76,30 +81,91 @@ export function LOAList() {
   // @ts-expect-error - totalItems is used for tracking, will be displayed in future updates
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [sortBy, setSortBy] = useState<string>("createdAt");
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<string>("dueDate");
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     const fetchLOAs = async () => {
       try {
-        const data = await getLOAs({
+        // Determine which status to filter by based on LOA type
+        let effectiveStatus: string | undefined;
+
+        if (loaTypeFilter === "completed") {
+          effectiveStatus = "CLOSED";
+        } else if (loaTypeFilter === "active") {
+          effectiveStatus = "ACTIVE";
+        } else if (loaTypeFilter === "overdue") {
+          // For overdue, we'll fetch ALL active LOAs and filter on frontend
+          effectiveStatus = "ACTIVE";
+        } else if (statusFilter && statusFilter !== "all") {
+          effectiveStatus = statusFilter;
+        }
+
+        // For active/overdue filters, fetch all LOAs (large limit) to filter on frontend
+        const fetchParams = (loaTypeFilter === "overdue" || loaTypeFilter === "active") ? {
+          page: 1,
+          limit: 10000, // Fetch all active LOAs
+          search: searchQuery || undefined,
+          status: effectiveStatus,
+          sortBy,
+          sortOrder
+        } : {
           page: currentPage,
           limit: pageSize,
           search: searchQuery || undefined,
-          status: statusFilter && statusFilter !== "all" ? statusFilter : undefined,
-          minValue: minValue ? parseFloat(minValue) : undefined,
-          maxValue: maxValue ? parseFloat(maxValue) : undefined,
-          hasEMD: hasEMD === "true" ? true : hasEMD === "false" ? false : undefined,
-          hasSecurity: hasSecurity === "true" ? true : hasSecurity === "false" ? false : undefined,
-          hasPerformanceGuarantee: hasPerformanceGuarantee === "true" ? true : hasPerformanceGuarantee === "false" ? false : undefined,
+          status: effectiveStatus,
           sortBy,
           sortOrder
-        });
+        };
 
-        setLOAs(data.loas || []);
-        setTotalItems(data.total || 0);
-        setTotalPages(data.totalPages || 0);
+        const data = await getLOAs(fetchParams);
+
+        let filteredLoas = data.loas || [];
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Set to start of today for accurate comparison
+
+        // If active filter is selected, show only LOAs with positive days to due date (not overdue)
+        if (loaTypeFilter === "active") {
+          filteredLoas = filteredLoas.filter((loa: LOA) => {
+            if (!loa.dueDate) return true; // Include LOAs without due date
+            const dueDate = new Date(loa.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            return dueDate >= now; // Include today and future dates
+          });
+
+          // Apply pagination on the filtered results
+          const totalFiltered = filteredLoas.length;
+          const startIndex = (currentPage - 1) * pageSize;
+          const endIndex = startIndex + pageSize;
+          filteredLoas = filteredLoas.slice(startIndex, endIndex);
+
+          setTotalItems(totalFiltered);
+          setTotalPages(Math.ceil(totalFiltered / pageSize));
+        }
+        // If overdue filter is selected, filter LOAs with due dates in the past
+        else if (loaTypeFilter === "overdue") {
+          filteredLoas = filteredLoas.filter((loa: LOA) => {
+            if (!loa.dueDate) return false;
+            const dueDate = new Date(loa.dueDate);
+            dueDate.setHours(0, 0, 0, 0);
+            return dueDate < now;
+          });
+
+          // Apply pagination on the filtered results
+          const totalFiltered = filteredLoas.length;
+          const startIndex = (currentPage - 1) * pageSize;
+          const endIndex = startIndex + pageSize;
+          filteredLoas = filteredLoas.slice(startIndex, endIndex);
+
+          setTotalItems(totalFiltered);
+          setTotalPages(Math.ceil(totalFiltered / pageSize));
+        } else {
+          setTotalItems(data.total || 0);
+          setTotalPages(data.totalPages || 0);
+        }
+
+        setLOAs(filteredLoas);
         setError(null);
       } catch (error) {
         console.error("Failed to fetch LOAs:", error);
@@ -109,7 +175,7 @@ export function LOAList() {
     };
 
     fetchLOAs();
-  }, [currentPage, pageSize, searchQuery, statusFilter, minValue, maxValue, hasEMD, hasSecurity, hasPerformanceGuarantee, sortBy, sortOrder]);
+  }, [currentPage, pageSize, searchQuery, statusFilter, loaTypeFilter, sortBy, sortOrder]);
 
   const handleDeleteClick = async (loa: LOA) => {
     try {
@@ -126,6 +192,55 @@ export function LOAList() {
     }
   };
 
+  const handleMarkCompleted = async (loaId: string) => {
+    try {
+      await updateLOA(loaId, { status: 'CLOSED' });
+
+      // Determine which status to filter by for refresh
+      let effectiveStatus: string | undefined;
+
+      if (loaTypeFilter === "completed") {
+        effectiveStatus = "CLOSED";
+      } else if (loaTypeFilter === "active" || loaTypeFilter === "overdue") {
+        effectiveStatus = "ACTIVE";
+      } else if (statusFilter && statusFilter !== "all") {
+        effectiveStatus = statusFilter;
+      }
+
+      // Refresh the list
+      const data = await getLOAs({
+        page: currentPage,
+        limit: pageSize,
+        search: searchQuery || undefined,
+        status: effectiveStatus,
+        sortBy,
+        sortOrder
+      });
+
+      let filteredLoas = data.loas || [];
+
+      // If overdue filter is selected, filter LOAs with due dates in the past
+      if (loaTypeFilter === "overdue") {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        filteredLoas = filteredLoas.filter((loa: LOA) => {
+          if (!loa.dueDate) return false;
+          const dueDate = new Date(loa.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
+          return dueDate < now;
+        });
+      }
+
+      setLOAs(filteredLoas);
+      setTotalItems(loaTypeFilter === "overdue" ? filteredLoas.length : (data.total || 0));
+      setTotalPages(loaTypeFilter === "overdue" ? Math.ceil(filteredLoas.length / pageSize) : (data.totalPages || 0));
+    } catch (error) {
+      console.error('Error marking LOA as completed:', error);
+      setError('Failed to mark LOA as completed. Please try again.');
+    }
+  };
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -137,10 +252,18 @@ export function LOAList() {
         return 'bg-gray-100 text-gray-800';
       case 'IN_PROGRESS':
         return 'bg-blue-100 text-blue-800';
+      case 'SUPPLY_WORK_DELAYED':
+        return 'bg-orange-100 text-orange-800';
       case 'SUPPLY_WORK_COMPLETED':
         return 'bg-green-100 text-green-800';
+      case 'APPLICATION_PENDING':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'UPLOAD_BILL':
+        return 'bg-cyan-100 text-cyan-800';
       case 'CHASE_PAYMENT':
         return 'bg-amber-100 text-amber-800';
+      case 'RETRIEVE_EMD_SECURITY':
+        return 'bg-indigo-100 text-indigo-800';
       case 'CLOSED':
         return 'bg-purple-100 text-purple-800';
       default:
@@ -155,10 +278,18 @@ export function LOAList() {
         return '1. Not Started';
       case 'IN_PROGRESS':
         return '2. In Progress';
+      case 'SUPPLY_WORK_DELAYED':
+        return '3. Supply/Work Delayed';
       case 'SUPPLY_WORK_COMPLETED':
         return '4. Supply/Work Completed';
+      case 'APPLICATION_PENDING':
+        return '5. Application Pending';
+      case 'UPLOAD_BILL':
+        return '6. Upload Bill';
       case 'CHASE_PAYMENT':
         return '7. Chase Payment';
+      case 'RETRIEVE_EMD_SECURITY':
+        return '8. Retrieve EMD/Security';
       case 'CLOSED':
         return '9. Closed';
       default:
@@ -218,10 +349,6 @@ export function LOAList() {
       },
     },
     {
-      header: "Delivery Date",
-      accessor: (row: LOA) => format(new Date(row.deliveryPeriod.end), "PP"),
-    },
-    {
       header: "Order Due Date",
       accessor: (row: LOA) => row.dueDate ? format(new Date(row.dueDate), "PP") : "-",
     },
@@ -263,11 +390,11 @@ export function LOAList() {
     },
     {
       header: "Security Deposit",
-      accessor: (row: LOA) =>
+      accessor: (row: LOA) => row.hasSd ? (row.sdFdr ?
         new Intl.NumberFormat("en-IN", {
           style: "currency",
           currency: "INR",
-        }).format(row.securityDepositAmount || 0),
+        }).format(row.sdFdr.depositAmount || 0) : "Yes") : "-",
     },
     {
       header: "Tender No.",
@@ -280,16 +407,8 @@ export function LOAList() {
     {
       header: "Order POC",
       accessor: (row: LOA) => (
-        <div className="max-w-xs truncate" title={row.orderPOC || undefined}>
-          {row.orderPOC || "-"}
-        </div>
-      ),
-    },
-    {
-      header: "FD/BG Details",
-      accessor: (row: LOA) => (
-        <div className="max-w-xs truncate" title={row.fdBgDetails || undefined}>
-          {row.fdBgDetails || "-"}
+        <div className="max-w-xs truncate" title={row.poc?.name || undefined}>
+          {row.poc?.name || "-"}
         </div>
       ),
     },
@@ -302,10 +421,6 @@ export function LOAList() {
       ),
     },
     {
-      header: "Last Invoice No.",
-      accessor: (row: LOA) => row.invoices?.[0]?.invoiceNumber || "-",
-    },
-    {
       header: "Last Invoice Amount",
       accessor: (row: LOA) =>
         new Intl.NumberFormat("en-IN", {
@@ -314,28 +429,12 @@ export function LOAList() {
         }).format(row.invoices?.[0]?.invoiceAmount || 0),
     },
     {
-      header: "Total Receivables",
-      accessor: (row: LOA) =>
-        new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: "INR",
-        }).format(row.invoices?.[0]?.totalReceivables || 0),
-    },
-    {
       header: "Actual Amount Received",
       accessor: (row: LOA) =>
         new Intl.NumberFormat("en-IN", {
           style: "currency",
           currency: "INR",
-        }).format(row.invoices?.[0]?.actualAmountReceived || 0),
-    },
-    {
-      header: "Amount Deducted",
-      accessor: (row: LOA) =>
-        new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: "INR",
-        }).format(row.invoices?.[0]?.amountDeducted || 0),
+        }).format(row.actualAmountReceived || 0),
     },
     {
       header: "Amount Pending",
@@ -343,23 +442,7 @@ export function LOAList() {
         new Intl.NumberFormat("en-IN", {
           style: "currency",
           currency: "INR",
-        }).format(row.invoices?.[0]?.amountPending || 0),
-    },
-    {
-      header: "Reason for Deduction",
-      accessor: (row: LOA) => (
-        <div className="max-w-xs truncate" title={row.invoices?.[0]?.deductionReason || undefined}>
-          {row.invoices?.[0]?.deductionReason || "-"}
-        </div>
-      ),
-    },
-    {
-      header: "Bill Links",
-      accessor: (row: LOA) => (
-        <div className="max-w-xs truncate" title={row.invoices?.[0]?.billLinks || undefined}>
-          {row.invoices?.[0]?.billLinks || "-"}
-        </div>
-      ),
+        }).format(row.amountPending || 0),
     },
     {
       header: "Actions",
@@ -374,6 +457,18 @@ export function LOAList() {
             <DropdownMenuItem onClick={() => navigate(`/loas/${row.id}`)}>
               View Details
             </DropdownMenuItem>
+            {row.status !== 'CLOSED' && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMarkCompleted(row.id);
+                }}
+                className="text-green-600"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Mark as Completed
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -384,11 +479,7 @@ export function LOAList() {
   const handleClearFilters = () => {
     setSearchQuery("");
     setStatusFilter("all");
-    setMinValue("");
-    setMaxValue("");
-    setHasEMD("all");
-    setHasSecurity("all");
-    setHasPerformanceGuarantee("all");
+    setLoaTypeFilter("all");
     setCurrentPage(1);
   };
 
@@ -412,7 +503,7 @@ export function LOAList() {
       {/* Filter Section */}
       <Card className="p-4">
         <div className="space-y-4">
-          {/* Basic Filters */}
+          {/* Filters */}
           <div className="grid gap-4 md:grid-cols-5">
             <div>
               <Input
@@ -421,6 +512,22 @@ export function LOAList() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full"
               />
+            </div>
+            <div>
+              <Select
+                value={loaTypeFilter}
+                onValueChange={setLoaTypeFilter}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All LOAs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All LOAs</SelectItem>
+                  <SelectItem value="active">Active LOAs</SelectItem>
+                  <SelectItem value="completed">Completed LOAs</SelectItem>
+                  <SelectItem value="overdue">Overdue LOAs</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Select
@@ -457,23 +564,10 @@ export function LOAList() {
                   <SelectItem value="createdAt-asc">Date (Oldest)</SelectItem>
                   <SelectItem value="loaValue-desc">Value (High to Low)</SelectItem>
                   <SelectItem value="loaValue-asc">Value (Low to High)</SelectItem>
-                  <SelectItem value="deliveryStartDate-asc">Start Date (Early)</SelectItem>
-                  <SelectItem value="deliveryStartDate-desc">Start Date (Late)</SelectItem>
-                  <SelectItem value="deliveryEndDate-asc">End Date (Early)</SelectItem>
-                  <SelectItem value="deliveryEndDate-desc">End Date (Late)</SelectItem>
-                  <SelectItem value="dueDate-asc">Due Date (Early)</SelectItem>
-                  <SelectItem value="dueDate-desc">Due Date (Late)</SelectItem>
+                  <SelectItem value="dueDate-asc">Due Date (Increasing)</SelectItem>
+                  <SelectItem value="dueDate-desc">Due Date (Decreasing)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <Button
-                variant="outline"
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="w-full"
-              >
-                {showAdvancedFilters ? "Hide" : "Show"} Advanced Filters
-              </Button>
             </div>
             <div className="flex gap-2">
               <Button
@@ -488,71 +582,6 @@ export function LOAList() {
               </Button>
             </div>
           </div>
-
-          {/* Advanced Filters */}
-          {showAdvancedFilters && (
-            <div className="grid gap-4 md:grid-cols-4 pt-4 border-t">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Min Value (₹)</label>
-                <Input
-                  type="number"
-                  placeholder="Min amount"
-                  value={minValue}
-                  onChange={(e) => setMinValue(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Max Value (₹)</label>
-                <Input
-                  type="number"
-                  placeholder="Max amount"
-                  value={maxValue}
-                  onChange={(e) => setMaxValue(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Has EMD</label>
-                <Select value={hasEMD} onValueChange={setHasEMD}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="true">Yes</SelectItem>
-                    <SelectItem value="false">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Has Security Deposit</label>
-                <Select value={hasSecurity} onValueChange={setHasSecurity}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="true">Yes</SelectItem>
-                    <SelectItem value="false">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Has Performance Guarantee</label>
-                <Select value={hasPerformanceGuarantee} onValueChange={setHasPerformanceGuarantee}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="true">Yes</SelectItem>
-                    <SelectItem value="false">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
         </div>
       </Card>
 

@@ -22,9 +22,10 @@ import {
   SelectValue 
 } from '../../../components/ui/select';
 
-import { Tender } from '../types/tender';
+import { Tender, EMDReturnStatus } from '../types/tender';
 import { Column, DataTable } from '../../../components/data-display/DataTable';
 import { StatusBadge } from '../../../components/data-display/StatusBadge';
+import { Badge } from '../../../components/ui/badge';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +57,21 @@ export function TenderList() {
   const { loading, getAllTenders, deleteTender } = useTenders();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
+
+  const getEMDReturnStatusBadge = (status: EMDReturnStatus | null | undefined) => {
+    if (!status) return <Badge variant="secondary" className="text-xs">Pending</Badge>;
+
+    switch (status) {
+      case 'PENDING':
+        return <Badge variant="secondary" className="text-xs">Pending</Badge>;
+      case 'RELEASED':
+        return <Badge className="bg-green-500 text-xs">Released</Badge>;
+      case 'RETAINED_AS_SD':
+        return <Badge variant="destructive" className="text-xs">Retained as SD</Badge>;
+      default:
+        return <Badge variant="outline" className="text-xs">{status}</Badge>;
+    }
+  };
 
   useEffect(() => {
     const fetchTenders = async () => {
@@ -127,6 +143,10 @@ export function TenderList() {
     {
       header: "Status",
       accessor: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      header: "EMD Status",
+      accessor: (row) => row.hasEMD ? getEMDReturnStatusBadge(row.emdReturnStatus) : '-',
     },
     {
       header: "Actions",

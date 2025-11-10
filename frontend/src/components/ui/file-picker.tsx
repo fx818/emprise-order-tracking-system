@@ -1,4 +1,4 @@
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, useState, useId } from "react";
 import { Button } from "./button";
 import { Upload } from "lucide-react";
 
@@ -9,6 +9,7 @@ interface FilePickerProps {
 
 export function FilePicker({ accept, onChange }: FilePickerProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const uniqueId = useId();
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files ? e.target.files[0] : null;
@@ -24,7 +25,7 @@ export function FilePicker({ accept, onChange }: FilePickerProps) {
           variant="outline"
           className="w-full"
           onClick={() => {
-            const input = document.getElementById("file-upload") as HTMLInputElement;
+            const input = document.getElementById(uniqueId) as HTMLInputElement;
             input.click();
           }}
         >
@@ -32,7 +33,7 @@ export function FilePicker({ accept, onChange }: FilePickerProps) {
           {selectedFile ? "Change File" : "Upload File"}
         </Button>
         <input
-          id="file-upload"
+          id={uniqueId}
           type="file"
           accept={accept}
           onChange={handleFileChange}

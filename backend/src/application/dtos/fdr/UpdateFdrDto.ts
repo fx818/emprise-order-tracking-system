@@ -2,7 +2,7 @@
 
 export interface UpdateFdrDto {
   // Basic FDR/BG Information
-  category?: 'FD' | 'BG';
+  category?: 'SD' | 'PG' | 'FD' | 'BG';
   bankName?: string;
   accountNo?: string;
   fdrNumber?: string;
@@ -20,10 +20,6 @@ export interface UpdateFdrDto {
   poc?: string;
   location?: string;
 
-  // Deposit Usage
-  emdAmount?: number;
-  sdAmount?: number;
-
   // Document
   documentFile?: Express.Multer.File;
   extractedData?: any;
@@ -33,8 +29,6 @@ export interface UpdateFdrDto {
 
   // Relations
   offerId?: string;
-  loaId?: string;
-  tenderId?: string;
 
   tags?: string[] | string;
 }

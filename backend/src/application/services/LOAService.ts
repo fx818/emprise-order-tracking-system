@@ -1,11 +1,15 @@
 // application/services/LoaService.ts
 import { promises as fs } from 'fs';
 import { PrismaLoaRepository } from '../../infrastructure/persistence/repositories/PrismaLoaRepository';
+import { PrismaTenderRepository } from '../../infrastructure/persistence/repositories/PrismaTenderRepository';
+import { PrismaOtherDocumentRepository } from '../../infrastructure/persistence/repositories/PrismaOtherDocumentRepository';
 import { S3Service } from '../../infrastructure/services/S3Service';
 import { CreateLoaDto } from '../dtos/loa/CreateLoaDto';
 import { UpdateLoaDto } from '../dtos/loa/UpdateLoaDto';
 import { CreateAmendmentDto } from '../dtos/loa/CreateAmendmentDto';
 import { UpdateAmendmentDto } from '../dtos/loa/UpdateAmendmentDto';
+import { CreateOtherDocumentDto } from '../dtos/loa/CreateOtherDocumentDto';
+import { UpdateOtherDocumentDto } from '../dtos/loa/UpdateOtherDocumentDto';
 import { UpdateStatusDto } from '../dtos/loa/UpdateStatusDto';
 import { Result, ResultUtils } from '../../shared/types/common.types';
 import { LoaValidator } from '../validators/loa.validator';
@@ -17,6 +21,8 @@ export class LoaService {
 
     constructor(
         private repository: PrismaLoaRepository,
+        private tenderRepository: PrismaTenderRepository,
+        private otherDocumentRepository: PrismaOtherDocumentRepository,
         private storageService: S3Service
     ) {
         this.validator = new LoaValidator();
@@ -63,6 +69,22 @@ export class LoaService {
                 return ResultUtils.fail('LOA number already exists');
             }
 
+            // Step 2.5: Validate tender if provided and auto-populate EMD
+            if (dto.tenderId) {
+                const tender = await this.tenderRepository.findById(dto.tenderId);
+                if (!tender) {
+                    return ResultUtils.fail('Tender not found');
+                }
+
+                // Auto-populate EMD from tender if not explicitly set
+                if (dto.hasEmd === undefined && tender.hasEMD) {
+                    dto.hasEmd = true;
+                    if (dto.emdAmount === undefined && tender.emdAmount) {
+                        dto.emdAmount = tender.emdAmount;
+                    }
+                }
+            }
+
             // Step 3: Process and normalize tags
             let tags: string[] = [];
             if (dto.tags) {
@@ -86,7 +108,7 @@ export class LoaService {
                 return ResultUtils.fail(documentUrls.errorMessage || 'Failed to process document files');
             }
 
-            // Step 5: Create LOA record with optional invoice
+            // Step 5: Create LOA record with FDR links and LOA-level billing fields
             const loa = await this.repository.create({
                 loaNumber: dto.loaNumber,
                 loaValue: dto.loaValue,
@@ -100,40 +122,38 @@ export class LoaService {
                 tags,
                 remarks: dto.remarks,
                 tenderNo: dto.tenderNo,
+                tenderId: dto.tenderId,
                 orderPOC: dto.orderPOC,
+                pocId: dto.pocId,
+                inspectionAgencyId: dto.inspectionAgencyId,
                 fdBgDetails: dto.fdBgDetails,
                 hasEmd: dto.hasEmd || false,
                 emdAmount: dto.emdAmount,
-                hasSecurityDeposit: dto.hasSecurityDeposit || false,
-                securityDepositAmount: dto.securityDepositAmount,
-                securityDepositDocumentUrl: documentUrls.securityDepositDocumentUrl,
-                hasPerformanceGuarantee: dto.hasPerformanceGuarantee || false,
-                performanceGuaranteeAmount: dto.performanceGuaranteeAmount,
-                performanceGuaranteeDocumentUrl: documentUrls.performanceGuaranteeDocumentUrl
+                sdFdrId: dto.sdFdrId,
+                pgFdrId: dto.pgFdrId,
+                warrantyPeriodMonths: dto.warrantyPeriodMonths,
+                warrantyPeriodYears: dto.warrantyPeriodYears,
+                warrantyStartDate: dto.warrantyStartDate ? new Date(dto.warrantyStartDate) : undefined,
+                warrantyEndDate: dto.warrantyEndDate ? new Date(dto.warrantyEndDate) : undefined,
+                // LOA-level billing fields (total across all bills)
+                actualAmountReceived: dto.actualAmountReceived,
+                amountDeducted: dto.amountDeducted,
+                amountPending: dto.amountPending,
+                deductionReason: dto.deductionReason,
             });
 
             // Step 6: Create Invoice record if billing data exists
-            const hasBillingData = dto.invoiceNumber ||
-                                   dto.invoiceAmount ||
-                                   dto.totalReceivables ||
-                                   dto.actualAmountReceived ||
-                                   dto.amountDeducted ||
-                                   dto.amountPending ||
-                                   dto.deductionReason ||
-                                   dto.billLinks;
+            const hasBillingData = dto.invoiceNumber || dto.invoiceAmount || dto.billLinks;
 
             if (hasBillingData) {
                 await this.repository.createInvoice({
                     loaId: loa.id,
                     invoiceNumber: dto.invoiceNumber,
                     invoiceAmount: dto.invoiceAmount,
-                    totalReceivables: dto.totalReceivables,
-                    actualAmountReceived: dto.actualAmountReceived,
-                    amountDeducted: dto.amountDeducted,
-                    amountPending: dto.amountPending,
-                    deductionReason: dto.deductionReason,
                     billLinks: dto.billLinks,
                     invoicePdfUrl: documentUrls.invoicePdfUrl,
+                    remarks: dto.remarks,
+                    status: 'REGISTERED',
                 });
             }
 
@@ -150,16 +170,12 @@ export class LoaService {
     private async processDocumentFiles(dto: CreateLoaDto): Promise<{
         success: boolean;
         documentUrl?: string;
-        securityDepositDocumentUrl?: string;
-        performanceGuaranteeDocumentUrl?: string;
         invoicePdfUrl?: string;
         errorMessage?: string;
     }> {
         try {
             // Initialize empty URLs
             let documentUrl = '';
-            let securityDepositDocumentUrl = '';
-            let performanceGuaranteeDocumentUrl = '';
             let invoicePdfUrl = '';
 
             // Process main LOA document
@@ -171,32 +187,6 @@ export class LoaService {
                     return {
                         success: false,
                         errorMessage: 'Failed to process LOA document file'
-                    };
-                }
-            }
-
-            // Process security deposit document (if applicable)
-            if (dto.securityDepositFile && dto.hasSecurityDeposit) {
-                try {
-                    securityDepositDocumentUrl = await this.processDocument(dto.securityDepositFile);
-                } catch (error) {
-                    console.error('Error processing security deposit file:', error);
-                    return {
-                        success: false,
-                        errorMessage: 'Failed to process security deposit file'
-                    };
-                }
-            }
-
-            // Process performance guarantee document (if applicable)
-            if (dto.performanceGuaranteeFile && dto.hasPerformanceGuarantee) {
-                try {
-                    performanceGuaranteeDocumentUrl = await this.processDocument(dto.performanceGuaranteeFile);
-                } catch (error) {
-                    console.error('Error processing performance guarantee file:', error);
-                    return {
-                        success: false,
-                        errorMessage: 'Failed to process performance guarantee file'
                     };
                 }
             }
@@ -217,8 +207,6 @@ export class LoaService {
             return {
                 success: true,
                 documentUrl,
-                securityDepositDocumentUrl,
-                performanceGuaranteeDocumentUrl,
                 invoicePdfUrl
             };
         } catch (error) {
@@ -245,10 +233,18 @@ export class LoaService {
                 }
             }
 
+            // Validate tender if provided
+            if (dto.tenderId !== undefined) {
+                if (dto.tenderId) {
+                    const tender = await this.tenderRepository.findById(dto.tenderId);
+                    if (!tender) {
+                        return ResultUtils.fail('Tender not found');
+                    }
+                }
+            }
+
             // Process files
             let documentUrl = existingLoa.documentUrl;
-            let securityDepositDocumentUrl = existingLoa.securityDepositDocumentUrl;
-            let performanceGuaranteeDocumentUrl = existingLoa.performanceGuaranteeDocumentUrl;
             let invoicePdfUrl: string | undefined;
 
             if (dto.documentFile) {
@@ -257,24 +253,6 @@ export class LoaService {
                 } catch (error) {
                     console.error('Error processing document file:', error);
                     return ResultUtils.fail('Failed to process document file');
-                }
-            }
-
-            if (dto.securityDepositFile && dto.hasSecurityDeposit) {
-                try {
-                    securityDepositDocumentUrl = await this.processDocument(dto.securityDepositFile);
-                } catch (error) {
-                    console.error('Error processing security deposit file:', error);
-                    return ResultUtils.fail('Failed to process security deposit file');
-                }
-            }
-
-            if (dto.performanceGuaranteeFile && dto.hasPerformanceGuarantee) {
-                try {
-                    performanceGuaranteeDocumentUrl = await this.processDocument(dto.performanceGuaranteeFile);
-                } catch (error) {
-                    console.error('Error processing performance guarantee file:', error);
-                    return ResultUtils.fail('Failed to process performance guarantee file');
                 }
             }
 
@@ -315,32 +293,34 @@ export class LoaService {
                 documentUrl,
                 tags,
                 deliveryPeriod,
+                status: dto.status,
                 remarks: dto.remarks,
                 tenderNo: dto.tenderNo,
+                tenderId: dto.tenderId,
                 orderPOC: dto.orderPOC,
+                pocId: dto.pocId,
+                inspectionAgencyId: dto.inspectionAgencyId,
                 fdBgDetails: dto.fdBgDetails,
                 hasEmd: dto.hasEmd,
                 emdAmount: dto.emdAmount,
-                hasSecurityDeposit: dto.hasSecurityDeposit,
-                securityDepositAmount: dto.securityDepositAmount,
-                securityDepositDocumentUrl,
-                hasPerformanceGuarantee: dto.hasPerformanceGuarantee,
-                performanceGuaranteeAmount: dto.performanceGuaranteeAmount,
-                performanceGuaranteeDocumentUrl
+                sdFdrId: dto.sdFdrId,
+                pgFdrId: dto.pgFdrId,
+                warrantyPeriodMonths: dto.warrantyPeriodMonths,
+                warrantyPeriodYears: dto.warrantyPeriodYears,
+                warrantyStartDate: dto.warrantyStartDate ? new Date(dto.warrantyStartDate) : undefined,
+                warrantyEndDate: dto.warrantyEndDate ? new Date(dto.warrantyEndDate) : undefined,
+                // LOA-level billing fields (total across all bills)
+                actualAmountReceived: dto.actualAmountReceived,
+                amountDeducted: dto.amountDeducted,
+                amountPending: dto.amountPending,
+                deductionReason: dto.deductionReason,
             };
 
             // Update the LOA
             const updatedLoa = await this.repository.update(id, updateData);
 
             // Handle invoice update/creation
-            const hasBillingData = dto.invoiceNumber ||
-                                   dto.invoiceAmount ||
-                                   dto.totalReceivables ||
-                                   dto.actualAmountReceived ||
-                                   dto.amountDeducted ||
-                                   dto.amountPending ||
-                                   dto.deductionReason ||
-                                   dto.billLinks;
+            const hasBillingData = dto.invoiceNumber || dto.invoiceAmount || dto.billLinks;
 
             if (hasBillingData) {
                 // Check if invoice already exists for this LOA
@@ -351,13 +331,9 @@ export class LoaService {
                     await this.repository.updateInvoice(existingInvoice.id, {
                         invoiceNumber: dto.invoiceNumber,
                         invoiceAmount: dto.invoiceAmount,
-                        totalReceivables: dto.totalReceivables,
-                        actualAmountReceived: dto.actualAmountReceived,
-                        amountDeducted: dto.amountDeducted,
-                        amountPending: dto.amountPending,
-                        deductionReason: dto.deductionReason,
                         billLinks: dto.billLinks,
                         invoicePdfUrl: invoicePdfUrl || existingInvoice.invoicePdfUrl,
+                        remarks: dto.remarks,
                     });
                 } else {
                     // Create new invoice
@@ -365,13 +341,10 @@ export class LoaService {
                         loaId: id,
                         invoiceNumber: dto.invoiceNumber,
                         invoiceAmount: dto.invoiceAmount,
-                        totalReceivables: dto.totalReceivables,
-                        actualAmountReceived: dto.actualAmountReceived,
-                        amountDeducted: dto.amountDeducted,
-                        amountPending: dto.amountPending,
-                        deductionReason: dto.deductionReason,
                         billLinks: dto.billLinks,
                         invoicePdfUrl,
+                        remarks: dto.remarks,
+                        status: 'REGISTERED',
                     });
                 }
             }
@@ -450,6 +423,7 @@ export class LoaService {
         limit?: number;
         siteId?: string;
         zoneId?: string;
+        tenderId?: string;
         status?: string;
         minValue?: number;
         maxValue?: number;
@@ -469,6 +443,7 @@ export class LoaService {
                 searchTerm: params.searchTerm,
                 siteId: params.siteId,
                 zoneId: params.zoneId,
+                tenderId: params.tenderId,
                 status: params.status,
                 minValue: params.minValue,
                 maxValue: params.maxValue,
@@ -499,6 +474,7 @@ export class LoaService {
             });
         } catch (error) {
             console.error('LOAs Fetch Error:', error);
+            console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
             throw new AppError('Failed to fetch LOA records');
         }
     }
@@ -599,6 +575,85 @@ export class LoaService {
         } catch (error) {
             console.error('Amendment Deletion Error:', error);
             throw new AppError('Failed to delete amendment record');
+        }
+    }
+
+    async createOtherDocument(loaId: string, dto: CreateOtherDocumentDto): Promise<Result<any>> {
+        try {
+            const validationResult = this.validator.validateOtherDocument(dto);
+            if (!validationResult.isSuccess) {
+                return ResultUtils.fail('Validation processing failed');
+            }
+
+            const loa = await this.repository.findById(loaId);
+            if (!loa) {
+                return ResultUtils.fail('LOA not found');
+            }
+
+            let documentUrl = '';
+            if (dto.documentFile) {
+                const fileName = `loas/other-documents/${crypto.randomUUID()}${path.extname(dto.documentFile.originalname)}`;
+                documentUrl = await this.storageService.uploadFile(
+                    fileName,
+                    dto.documentFile.buffer,
+                    dto.documentFile.mimetype
+                );
+            }
+
+            const otherDocument = await this.otherDocumentRepository.create({
+                title: dto.title,
+                documentUrl,
+                loaId
+            });
+
+            return ResultUtils.ok(otherDocument);
+        } catch (error) {
+            console.error('Other Document Creation Error:', error);
+            throw new AppError('Failed to create other document record');
+        }
+    }
+
+    async updateOtherDocument(id: string, dto: UpdateOtherDocumentDto): Promise<Result<any>> {
+        try {
+            const existingDocument = await this.otherDocumentRepository.findById(id);
+            if (!existingDocument) {
+                return ResultUtils.fail('Other document not found');
+            }
+
+            let documentUrl = existingDocument.documentUrl;
+            if (dto.documentFile) {
+                const fileName = `loas/other-documents/${crypto.randomUUID()}${path.extname(dto.documentFile.originalname)}`;
+                documentUrl = await this.storageService.uploadFile(
+                    fileName,
+                    dto.documentFile.buffer,
+                    dto.documentFile.mimetype
+                );
+            }
+
+            const updatedDocument = await this.otherDocumentRepository.update(id, {
+                title: dto.title || existingDocument.title,
+                documentUrl
+            });
+
+            return ResultUtils.ok(updatedDocument);
+        } catch (error) {
+            console.error('Other Document Update Error:', error);
+            throw new AppError('Failed to update other document record');
+        }
+    }
+
+    async deleteOtherDocument(id: string): Promise<Result<void>> {
+        try {
+            const document = await this.otherDocumentRepository.findById(id);
+            if (!document) {
+                return ResultUtils.fail('Other document not found');
+            }
+
+            await this.otherDocumentRepository.delete(id);
+            return ResultUtils.ok(undefined);
+        } catch (error) {
+            console.error('Other Document Deletion Error:', error);
+            throw new AppError('Failed to delete other document record');
         }
     }
 

@@ -8,10 +8,10 @@ export function useFDRs() {
   const { showSuccess, showError } = useToast();
 
   // GET /fdrs - Get all FDRs
-  const getAllFDRs = async () => {
+  const getAllFDRs = async (limit: number = 1000) => {
     try {
       setLoading(true);
-      const response = await apiClient.get<FDRResponse>('/fdrs');
+      const response = await apiClient.get<FDRResponse>(`/fdrs?limit=${limit}`);
       // Handle the list response structure
       if ('data' in response.data.data) {
         return response.data.data.data || [];

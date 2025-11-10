@@ -240,8 +240,6 @@ export class BulkImportFdrService {
               contractDetails: row.contractDetails,
               poc: row.poc,
               location: row.location,
-              emdAmount: row.emd,
-              sdAmount: row.sd,
               status: status,
               tags: [category], // Tag with FD or BG
             }

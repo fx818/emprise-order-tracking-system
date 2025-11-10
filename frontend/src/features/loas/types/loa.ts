@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type { Customer } from '../../customers/hooks/use-customers';
+import type { Tender } from '../../tenders/types/tender';
 
 // Define the schema for the delivery period
 const deliveryPeriodSchema = z.object({
@@ -15,34 +17,36 @@ export const loaSchema = z.object({
   orderReceivedDate: z.date().optional().nullable(),
   workDescription: z.string().min(1, 'Work description is required'),
   tags: z.array(z.string()),
-  documentFile: z.any().refine((val) => !!val, { message: 'Document file is required' }), // File is required
+  documentFile: z.any().optional(), // File is optional for both create and edit
   emdId: z.string().optional(), // EMD ID field
   siteId: z.string().min(1, 'Site is required'), // Add site field
+  status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'SUPPLY_WORK_COMPLETED', 'CHASE_PAYMENT', 'CLOSED', 'SUPPLY_WORK_DELAYED', 'APPLICATION_PENDING', 'UPLOAD_BILL', 'RETRIEVE_EMD_SECURITY']).default('NOT_STARTED'),
   remarks: z.string().optional(),
   tenderNo: z.string().optional(),
-  orderPOC: z.string().optional(),
+  tenderId: z.string().optional(),
+  pocId: z.string().optional(),
+  inspectionAgencyId: z.string().optional(),
   fdBgDetails: z.string().optional(),
   hasEmd: z.boolean().default(false),
   emdAmount: z.number().optional().nullable(),
-  hasSecurityDeposit: z.boolean().default(false),
-  securityDepositAmount: z.number().optional().nullable(),
-  securityDepositFile: z.any().optional(),
-  hasPerformanceGuarantee: z.boolean().default(false),
-  performanceGuaranteeAmount: z.number().optional().nullable(),
-  performanceGuaranteeFile: z.any().optional(),
+  hasSd: z.boolean().default(false),
+  sdFdrId: z.string().optional().nullable(),
+  hasPg: z.boolean().default(false),
+  pgFdrId: z.string().optional().nullable(),
+  receivablePending: z.number().optional().nullable(),
+  // LOA-level billing fields (total across all bills)
+  actualAmountReceived: z.number().optional().nullable(),
+  amountDeducted: z.number().optional().nullable(),
+  amountPending: z.number().optional().nullable(),
+  deductionReason: z.string().optional(),
   // Warranty period fields
   warrantyPeriodMonths: z.number().min(0).optional().nullable(),
   warrantyPeriodYears: z.number().min(0).optional().nullable(),
   warrantyStartDate: z.date().optional().nullable(),
   warrantyEndDate: z.date().optional().nullable(),
-  // Billing/Invoice fields
+  // Billing/Invoice fields (for individual bill/invoice records)
   invoiceNumber: z.string().optional(),
   invoiceAmount: z.number().optional().nullable(),
-  totalReceivables: z.number().optional().nullable(),
-  actualAmountReceived: z.number().optional().nullable(),
-  amountDeducted: z.number().optional().nullable(),
-  amountPending: z.number().optional().nullable(),
-  deductionReason: z.string().optional(),
   billLinks: z.string().optional(),
   invoicePdfFile: z.any().optional(),
 });
@@ -54,10 +58,17 @@ export const amendmentSchema = z.object({
   tags: z.array(z.string()),
 });
 
+// Schema for creating an other document
+export const otherDocumentSchema = z.object({
+  title: z.string().min(3, 'Document title must be at least 3 characters').max(100, 'Document title must be at most 100 characters'),
+  documentFile: z.any(),
+});
+
 // Types derived from schemas
 export type DeliveryPeriod = z.infer<typeof deliveryPeriodSchema>;
 export type LOAFormData = z.infer<typeof loaSchema>;
 export type AmendmentFormData = z.infer<typeof amendmentSchema>;
+export type OtherDocumentFormData = z.infer<typeof otherDocumentSchema>;
 
 // Interface for Purchase Order
 export interface PurchaseOrder {
@@ -70,26 +81,57 @@ export interface PurchaseOrder {
   updatedAt: string;
 }
 
-// Interface for LOA with additional properties
-export interface LOA extends Omit<LOAFormData, 'documentFile' | 'securityDepositFile' | 'performanceGuaranteeFile' | 'invoicePdfFile'> {
+// Interface for FDR (simplified for LOA display)
+export interface FDRSummary {
   id: string;
-  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'SUPPLY_WORK_COMPLETED' | 'CHASE_PAYMENT' | 'CLOSED';
+  bankName: string;
+  depositAmount: number;
+  dateOfDeposit: string;
+  maturityDate?: string;
+  status: string;
+  category: string;
+}
+
+// Interface for LOA with additional properties
+export interface LOA extends Omit<LOAFormData, 'documentFile' | 'invoicePdfFile'> {
+  id: string;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'SUPPLY_WORK_COMPLETED' | 'CHASE_PAYMENT' | 'CLOSED' | 'SUPPLY_WORK_DELAYED' | 'APPLICATION_PENDING' | 'UPLOAD_BILL' | 'RETRIEVE_EMD_SECURITY';
   documentUrl?: string;
-  securityDepositDocumentUrl?: string;
-  performanceGuaranteeDocumentUrl?: string;
+  sdFdr?: FDRSummary;
+  pgFdr?: FDRSummary;
+  actualAmountReceived?: number | null;
+  amountDeducted?: number | null;
+  amountPending?: number | null;
+  deductionReason?: string;
   amendments: Amendment[];
+  otherDocuments?: OtherDocument[];
   purchaseOrders: PurchaseOrder[];
   invoices?: Invoice[];
   daysToDueDateFromExcel?: number | null;  // Days to due date from Excel (negative=overdue, positive=remaining, null=completed)
-  site: {
+  site?: {
     id: string;
     name: string;
+    code: string;
     location: string;
     status: string;
+    zoneId: string;
+    zone?: Customer;  // Customer/Zone information
   };
+  tender?: Tender;  // Optional tender information
+  poc?: {
+    id: string;
+    name: string;
+  };  // Optional POC information
+  inspectionAgency?: {
+    id: string;
+    name: string;
+  };  // Optional Inspection Agency information
   createdAt: string;
   updatedAt: string;
 }
+
+// Bill status type
+export type BillStatus = 'REGISTERED' | 'RETURNED' | 'PAYMENT_MADE';
 
 // Interface for Invoice/Billing data
 export interface Invoice {
@@ -97,14 +139,10 @@ export interface Invoice {
   loaId: string;
   invoiceNumber?: string;
   invoiceAmount?: number;
-  totalReceivables?: number;
-  actualAmountReceived?: number;
-  amountDeducted?: number;
-  amountPending?: number;
-  deductionReason?: string;
   billLinks?: string;
   invoicePdfUrl?: string;
   remarks?: string;
+  status: BillStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -117,4 +155,13 @@ export interface Amendment extends Omit<AmendmentFormData, 'documentFile'> {
   createdAt: string;
   updatedAt: string;
   loa?: LOA;
+}
+
+// Interface for OtherDocument with additional properties
+export interface OtherDocument extends Omit<OtherDocumentFormData, 'documentFile'> {
+  id: string;
+  loaId: string;
+  documentUrl: string;
+  createdAt: string;
+  updatedAt: string;
 }

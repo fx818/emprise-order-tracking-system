@@ -24,7 +24,12 @@ import { LoadingSpinner } from "../../../components/feedback/LoadingSpinner";
 import { Alert, AlertDescription } from "../../../components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { useLOAs } from "../hooks/use-loas";
-import type { LOA} from "../types/loa";
+import { useBills } from "../../bills/hooks/use-bills";
+import { BillList } from "../../bills/components/BillList";
+import { BillForm } from "../../bills/components/BillForm";
+import { BillAnalytics } from "../../bills/components/BillAnalytics";
+import { LOAFinancialForm } from "./LOAFinancialForm";
+import type { LOA, Invoice } from "../types/loa";
 import { cn } from "../../../lib/utils";
 
 import {
@@ -38,6 +43,7 @@ import {
 // import { LOAForm } from "./LOAForm";
 import { Badge } from "../../../components/ui/badge";
 import { StatusUpdateDialog } from "./StatusUpdateDialog"; // Import the new dialog
+import { OtherDocumentUploadDialog } from "./OtherDocumentUploadDialog";
 
 // Add formatCurrency helper function
 const formatCurrency = (value: number): string => {
@@ -88,13 +94,23 @@ const getStatusDisplayText = (status: LOA['status']) => {
 export function LOADetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { loading, getLOAById, deleteLOA, deleteAmendment } = useLOAs();
+  const { loading, getLOAById, updateLOA, deleteLOA, deleteAmendment, createOtherDocument, deleteOtherDocument } = useLOAs();
+  const { loading: billsLoading, getBillsByLoaId, createBill, updateBill, deleteBill } = useBills();
   const [loa, setLOA] = useState<LOA | null>(null);
+  const [bills, setBills] = useState<Invoice[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteAmendmentDialogOpen, setDeleteAmendmentDialogOpen] = useState(false);
   const [amendmentToDelete, setAmendmentToDelete] = useState<{ id: string; number: string } | null>(null);
   // Add state for status update dialog
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  // Bill form state
+  const [billFormOpen, setBillFormOpen] = useState(false);
+  // Other document upload dialog state
+  const [otherDocUploadDialogOpen, setOtherDocUploadDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [editingBill, setEditingBill] = useState<Invoice | undefined>();
+  // Financial data edit dialog state
+  const [financialDialogOpen, setFinancialDialogOpen] = useState(false);
 
   const fetchLOA = useCallback(async () => {
     if (!id) return;
@@ -115,9 +131,21 @@ export function LOADetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const fetchBills = useCallback(async () => {
+    if (!id) return;
+    try {
+      const billsData = await getBillsByLoaId(id);
+      setBills(billsData);
+    } catch (error) {
+      console.error("Error fetching bills:", error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   useEffect(() => {
     fetchLOA();
-  }, [fetchLOA]);
+    fetchBills();
+  }, [fetchLOA, fetchBills]);
 
   if (loading && !loa) {
     return <LoadingSpinner />;
@@ -168,7 +196,7 @@ export function LOADetail() {
 
   const handleDeleteAmendment = async () => {
     if (!amendmentToDelete) return;
-    
+
     try {
       await deleteAmendment(amendmentToDelete.id);
       // Refresh LOA details after deletion
@@ -177,6 +205,89 @@ export function LOADetail() {
       setAmendmentToDelete(null);
     } catch (error) {
       console.error('Error deleting amendment:', error);
+    }
+  };
+
+  // Other document handlers
+  const handleUploadOtherDocument = async (data: { title: string; documentFile?: any }) => {
+    if (!id || !data.documentFile) return;
+
+    try {
+      await createOtherDocument(id, { title: data.title, documentFile: data.documentFile });
+      // Refresh LOA details after upload
+      fetchLOA();
+    } catch (error) {
+      console.error('Error uploading other document:', error);
+    }
+  };
+
+  const handleDeleteOtherDocument = async () => {
+    if (!documentToDelete) return;
+
+    try {
+      await deleteOtherDocument(documentToDelete.id);
+      // Refresh LOA details after deletion
+      fetchLOA();
+      setDocumentToDelete(null);
+    } catch (error) {
+      console.error('Error deleting other document:', error);
+    }
+  };
+
+  // Bill handlers
+  const handleAddBill = () => {
+    setEditingBill(undefined);
+    setBillFormOpen(true);
+  };
+
+  const handleEditBill = (bill: Invoice) => {
+    setEditingBill(bill);
+    setBillFormOpen(true);
+  };
+
+  const handleBillSubmit = async (data: any) => {
+    if (!id) return;
+
+    try {
+      if (editingBill) {
+        await updateBill(editingBill.id, data);
+      } else {
+        await createBill(id, data);
+      }
+      setBillFormOpen(false);
+      setEditingBill(undefined);
+      fetchBills();
+    } catch (error) {
+      console.error('Error saving bill:', error);
+    }
+  };
+
+  const handleDeleteBill = async (billId: string) => {
+    try {
+      await deleteBill(billId);
+      fetchBills();
+    } catch (error) {
+      console.error('Error deleting bill:', error);
+    }
+  };
+
+  // Financial data update handler
+  const handleFinancialUpdate = async (data: {
+    receivablePending?: number;
+    actualAmountReceived?: number;
+    amountDeducted?: number;
+    amountPending?: number;
+    deductionReason?: string;
+  }) => {
+    if (!id) return;
+
+    try {
+      await updateLOA(id, data);
+      // Refresh LOA details after update
+      fetchLOA();
+    } catch (error) {
+      console.error('Error updating LOA financial data:', error);
+      throw error; // Re-throw to let the form handle the error
     }
   };
 
@@ -264,7 +375,7 @@ export function LOADetail() {
         <TabsList>
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="billing">
-            Billing {loa.invoices && loa.invoices.length > 0 && `(${loa.invoices.length})`}
+            Bills {bills.length > 0 && `(${bills.length})`}
           </TabsTrigger>
           <TabsTrigger value="amendments">
             Amendments ({loa.amendments.length})
@@ -308,6 +419,28 @@ export function LOADetail() {
                   </h3>
                   <p className="mt-1">
                     {format(new Date(loa.createdAt), "PPP")}
+                  </p>
+                </div>
+                {/* Customer Information */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Customer
+                  </h3>
+                  <p className="mt-1 font-medium">{loa.site?.zone?.name || 'N/A'}</p>
+                  {loa.site?.zone?.headquarters && (
+                    <p className="text-sm text-muted-foreground">
+                      {loa.site.zone.headquarters}
+                    </p>
+                  )}
+                </div>
+                {/* Site Information */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Site
+                  </h3>
+                  <p className="mt-1">{loa.site?.name || 'N/A'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Code: {loa.site?.code || 'N/A'}
                   </p>
                 </div>
               </div>
@@ -455,63 +588,99 @@ export function LOADetail() {
                 </div>
               </div>
 
-              {/* Security Deposit Section */}
+              {/* Security Deposit FDR Section */}
               <div>
-                <h3 className="text-lg font-medium mb-2">Security Deposit</h3>
+                <h3 className="text-lg font-medium mb-2">Security Deposit (SD) FDR</h3>
                 <div className="bg-muted p-4 rounded-lg">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium mr-2 ${loa.hasSecurityDeposit ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {loa.hasSecurityDeposit ? 'Required' : 'Not Required'}
-                        </span>
-                        <span className="font-medium">Amount: {formatCurrency(loa.securityDepositAmount || 0)}</span>
+                  {loa.sdFdr ? (
+                    <div className="space-y-3">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground mb-1">Bank Name</div>
+                          <div className="text-sm font-semibold">{loa.sdFdr.bankName}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground mb-1">Deposit Amount</div>
+                          <div className="text-sm font-semibold">{formatCurrency(loa.sdFdr.depositAmount)}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground mb-1">Date of Deposit</div>
+                          <div className="text-sm">{format(new Date(loa.sdFdr.dateOfDeposit), "PPP")}</div>
+                        </div>
+                        {loa.sdFdr.maturityDate && (
+                          <div>
+                            <div className="text-sm font-medium text-muted-foreground mb-1">Maturity Date</div>
+                            <div className="text-sm">{format(new Date(loa.sdFdr.maturityDate), "PPP")}</div>
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground mb-1">Status</div>
+                          <Badge className={`${loa.sdFdr.status === 'RUNNING' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {loa.sdFdr.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/fdrs/${loa.sdFdr?.id}`)}
+                        >
+                          View Full FDR Details
+                        </Button>
                       </div>
                     </div>
-                    {loa.securityDepositDocumentUrl && (
-                      <div className="mt-2">
-                        <a
-                          href={loa.securityDepositDocumentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline flex items-center"
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          View Security Deposit Document
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No Security Deposit FDR linked</div>
+                  )}
                 </div>
               </div>
 
-              {/* Performance Guarantee Section */}
+              {/* Performance Guarantee FDR Section */}
               <div>
-                <h3 className="text-lg font-medium mb-2">Performance Guarantee</h3>
+                <h3 className="text-lg font-medium mb-2">Performance Guarantee (PG) FDR</h3>
                 <div className="bg-muted p-4 rounded-lg">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium mr-2 ${loa.hasPerformanceGuarantee ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {loa.hasPerformanceGuarantee ? 'Required' : 'Not Required'}
-                        </span>
-                        <span className="font-medium">Amount: {formatCurrency(loa.performanceGuaranteeAmount || 0)}</span>
+                  {loa.pgFdr ? (
+                    <div className="space-y-3">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground mb-1">Bank Name</div>
+                          <div className="text-sm font-semibold">{loa.pgFdr.bankName}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground mb-1">Deposit Amount</div>
+                          <div className="text-sm font-semibold">{formatCurrency(loa.pgFdr.depositAmount)}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground mb-1">Date of Deposit</div>
+                          <div className="text-sm">{format(new Date(loa.pgFdr.dateOfDeposit), "PPP")}</div>
+                        </div>
+                        {loa.pgFdr.maturityDate && (
+                          <div>
+                            <div className="text-sm font-medium text-muted-foreground mb-1">Maturity Date</div>
+                            <div className="text-sm">{format(new Date(loa.pgFdr.maturityDate), "PPP")}</div>
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-sm font-medium text-muted-foreground mb-1">Status</div>
+                          <Badge className={`${loa.pgFdr.status === 'RUNNING' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {loa.pgFdr.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/fdrs/${loa.pgFdr?.id}`)}
+                        >
+                          View Full FDR Details
+                        </Button>
                       </div>
                     </div>
-                    {loa.performanceGuaranteeDocumentUrl && (
-                      <div className="mt-2">
-                        <a
-                          href={loa.performanceGuaranteeDocumentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline flex items-center"
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          View Performance Guarantee Document
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No Performance Guarantee FDR linked</div>
+                  )}
                 </div>
               </div>
 
@@ -528,7 +697,13 @@ export function LOADetail() {
                   {/* Order Point of Contact */}
                   <div>
                     <div className="text-sm font-medium text-muted-foreground mb-1">Order Point of Contact</div>
-                    <div className="text-sm">{loa.orderPOC || '-'}</div>
+                    <div className="text-sm">{loa.poc?.name || '-'}</div>
+                  </div>
+
+                  {/* Inspection Agency */}
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">Inspection Agency</div>
+                    <div className="text-sm">{loa.inspectionAgency?.name || '-'}</div>
                   </div>
 
                   {/* FD/BG Details */}
@@ -551,177 +726,43 @@ export function LOADetail() {
         </TabsContent>
 
         <TabsContent value="billing">
-          <Card>
-            <CardHeader>
-              <CardTitle>Billing & Invoice Information</CardTitle>
-              <CardDescription>
-                Track all billing, invoices, and payment information for this LOA
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Show invoice if exists, otherwise show empty state with all fields */}
-                {loa.invoices && loa.invoices.length > 0 ? (
-                  loa.invoices.map((invoice) => (
-                    <div key={invoice.id} className="border rounded-lg overflow-hidden">
-                      {/* Invoice Header */}
-                      <div className="bg-muted px-4 py-3 border-b">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-semibold text-lg">
-                              {invoice.invoiceNumber || '-'}
-                            </h3>
-                            <p className="text-sm text-muted-foreground">
-                              Last updated: {format(new Date(invoice.updatedAt), "PPP")}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+          <div className="space-y-4">
+            {/* Bill Analytics with Edit Button */}
+            <BillAnalytics
+              loaValue={loa.loaValue}
+              receivablePending={loa.receivablePending ?? undefined}
+              bills={bills}
+              loaActualAmountReceived={loa.actualAmountReceived ?? undefined}
+              loaAmountDeducted={loa.amountDeducted ?? undefined}
+              loaAmountPending={loa.amountPending ?? undefined}
+              loaDeductionReason={loa.deductionReason}
+              onEditClick={() => setFinancialDialogOpen(true)}
+            />
 
-                      {/* Invoice Details */}
-                      <div className="p-4 space-y-6">
-                        {/* Financial Summary Grid - ALWAYS SHOW ALL FIELDS */}
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                          {/* Last Invoice Amount */}
-                          <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                              Last Invoice Amount
-                            </h4>
-                            <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                              {formatCurrency(invoice.invoiceAmount || 0)}
-                            </p>
-                          </div>
-
-                          {/* Total Receivables */}
-                          <div className="bg-purple-50 dark:bg-purple-950 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                              Total Receivables
-                            </h4>
-                            <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                              {formatCurrency(invoice.totalReceivables || 0)}
-                            </p>
-                          </div>
-
-                          {/* Actual Amount Received */}
-                          <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                              Actual Amount Received
-                            </h4>
-                            <p className="text-2xl font-bold text-green-700 dark:text-green-300">
-                              {formatCurrency(invoice.actualAmountReceived || 0)}
-                            </p>
-                          </div>
-
-                          {/* Amount Pending */}
-                          <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
-                            <h4 className="text-sm font-medium text-muted-foreground mb-1">
-                              Amount Pending
-                            </h4>
-                            <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-                              {formatCurrency(invoice.amountPending || 0)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Deduction Information - ALWAYS SHOW */}
-                        <div className={`border-l-4 p-4 rounded-lg ${invoice.amountDeducted && invoice.amountDeducted > 0 ? 'bg-red-50 dark:bg-red-950 border-red-500' : 'bg-gray-50 dark:bg-gray-950 border-gray-500'}`}>
-                          <h4 className={`text-sm font-semibold mb-2 ${invoice.amountDeducted && invoice.amountDeducted > 0 ? 'text-red-800 dark:text-red-300' : 'text-gray-800 dark:text-gray-300'}`}>
-                            Deduction Information
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">Amount Deducted</span>
-                              <span className={`text-lg font-bold ${invoice.amountDeducted && invoice.amountDeducted > 0 ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'}`}>
-                                {formatCurrency(invoice.amountDeducted || 0)}
-                              </span>
-                            </div>
-                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800">
-                              <h5 className="text-sm font-medium text-muted-foreground mb-1">
-                                Reason for Deduction
-                              </h5>
-                              <p className="text-sm">{invoice.deductionReason || "-"}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Bill Links - ALWAYS SHOW */}
-                        <div className="bg-muted p-4 rounded-lg">
-                          <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                            Bill Links
-                          </h4>
-                          <div className="flex items-center gap-2">
-                            {invoice.billLinks ? (
-                              <a
-                                href={invoice.billLinks}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline flex items-center gap-1"
-                              >
-                                <FileText className="h-4 w-4" />
-                                View Bill Document
-                              </a>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  /* Empty state showing all fields with ₹0 or "-" */
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="bg-muted px-4 py-3 border-b">
-                      <h3 className="font-semibold text-lg">No Invoice Data</h3>
-                      <p className="text-sm text-muted-foreground">All fields are displayed below</p>
-                    </div>
-                    <div className="p-4 space-y-6">
-                      {/* Financial Summary Grid */}
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Last Invoice Amount</h4>
-                          <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(0)}</p>
-                        </div>
-                        <div className="bg-purple-50 dark:bg-purple-950 p-4 rounded-lg">
-                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Total Receivables</h4>
-                          <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(0)}</p>
-                        </div>
-                        <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
-                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Actual Amount Received</h4>
-                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{formatCurrency(0)}</p>
-                        </div>
-                        <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
-                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Amount Pending</h4>
-                          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(0)}</p>
-                        </div>
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-950 border-l-4 border-gray-500 p-4 rounded-lg">
-                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-300 mb-2">Deduction Information</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Amount Deducted</span>
-                            <span className="text-lg font-bold text-gray-700 dark:text-gray-300">{formatCurrency(0)}</span>
-                          </div>
-                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-800">
-                            <h5 className="text-sm font-medium text-muted-foreground mb-1">Reason for Deduction</h5>
-                            <p className="text-sm">-</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-muted p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Remarks</h4>
-                        <p className="text-sm">-</p>
-                      </div>
-                      <div className="bg-muted p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Bill Links</h4>
-                        <span className="text-sm text-muted-foreground">-</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            {/* Bills List */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Bills & Invoices</CardTitle>
+                  <CardDescription>
+                    Manage all bills and invoices for this LOA
+                  </CardDescription>
+                </div>
+                <Button onClick={handleAddBill} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Bill
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <BillList
+                  bills={bills}
+                  onEdit={handleEditBill}
+                  onDelete={handleDeleteBill}
+                  loading={billsLoading}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="amendments">
@@ -877,7 +918,7 @@ export function LOADetail() {
             <CardContent>
               <div className="space-y-4">
                 {/* Original LOA Document */}
-                {loa.documentUrl && (
+                {loa.documentUrl && loa.documentUrl !== 'pending' && (
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       <FileText className="h-6 w-6 text-muted-foreground" />
@@ -899,51 +940,6 @@ export function LOADetail() {
                   </div>
                 )}
 
-                {/* Security Deposit Document */}
-                {loa.hasSecurityDeposit && loa.securityDepositDocumentUrl && (
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <FileText className="h-6 w-6 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium">Security Deposit Document</div>
-                        <div className="text-sm text-muted-foreground">
-                          Amount: {formatCurrency(loa.securityDepositAmount || 0)}
-                        </div>
-                      </div>
-                    </div>
-                    <a
-                      href={loa.securityDepositDocumentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      View Document
-                    </a>
-                  </div>
-                )}
-
-                {/* Performance Guarantee Document */}
-                {loa.hasPerformanceGuarantee && loa.performanceGuaranteeDocumentUrl && (
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <FileText className="h-6 w-6 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium">Performance Guarantee Document</div>
-                        <div className="text-sm text-muted-foreground">
-                          Amount: {formatCurrency(loa.performanceGuaranteeAmount || 0)}
-                        </div>
-                      </div>
-                    </div>
-                    <a
-                      href={loa.performanceGuaranteeDocumentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      View Document
-                    </a>
-                  </div>
-                )}
 
                 {/* Amendment Documents */}
                 {loa.amendments.map((amendment) => (
@@ -972,11 +968,63 @@ export function LOADetail() {
                   )
                 ))}
 
+                {/* Other Documents Section */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-lg">Other Documents</h3>
+                    <Button
+                      size="sm"
+                      onClick={() => setOtherDocUploadDialogOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Upload Document
+                    </Button>
+                  </div>
+
+                  {loa.otherDocuments && loa.otherDocuments.length > 0 ? (
+                    <div className="space-y-2">
+                      {loa.otherDocuments.map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center space-x-4">
+                            <FileText className="h-6 w-6 text-muted-foreground" />
+                            <div>
+                              <div className="font-medium">{doc.title}</div>
+                              <div className="text-sm text-muted-foreground">
+                                Uploaded on {format(new Date(doc.createdAt), "PPP")}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <a
+                              href={doc.documentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              View Document
+                            </a>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDocumentToDelete({ id: doc.id, title: doc.title })}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground py-4 text-sm">
+                      No other documents uploaded yet
+                    </div>
+                  )}
+                </div>
+
                 {/* Show message if no documents are available */}
-                {!loa.documentUrl && 
-                  !loa.securityDepositDocumentUrl && 
-                  !loa.performanceGuaranteeDocumentUrl && 
-                  loa.amendments.every(a => !a.documentUrl) && (
+                {(!loa.documentUrl || loa.documentUrl === 'pending') &&
+                  loa.amendments.every(a => !a.documentUrl) &&
+                  (!loa.otherDocuments || loa.otherDocuments.length === 0) && (
                   <div className="text-center text-muted-foreground py-8">
                     No documents have been uploaded for this LOA
                   </div>
@@ -1059,6 +1107,67 @@ export function LOADetail() {
           open={statusDialogOpen}
           onOpenChange={setStatusDialogOpen}
           onStatusUpdate={handleStatusUpdate}
+        />
+      )}
+
+      {/* Bill Form Dialog */}
+      <BillForm
+        open={billFormOpen}
+        onOpenChange={setBillFormOpen}
+        onSubmit={handleBillSubmit}
+        initialData={editingBill}
+        loading={billsLoading}
+      />
+
+      {/* Other Document Upload Dialog */}
+      <OtherDocumentUploadDialog
+        isOpen={otherDocUploadDialogOpen}
+        onClose={() => setOtherDocUploadDialogOpen(false)}
+        onSubmit={handleUploadOtherDocument}
+        isSubmitting={loading}
+      />
+
+      {/* Delete Other Document Confirmation Dialog */}
+      <Dialog open={!!documentToDelete} onOpenChange={() => setDocumentToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Document</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{documentToDelete?.title}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDocumentToDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteOtherDocument}
+              disabled={loading}
+            >
+              {loading ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* LOA Financial Data Edit Dialog */}
+      {loa && (
+        <LOAFinancialForm
+          open={financialDialogOpen}
+          onOpenChange={setFinancialDialogOpen}
+          loaId={loa.id}
+          loaValue={loa.loaValue}
+          receivablePending={loa.receivablePending}
+          actualAmountReceived={loa.actualAmountReceived}
+          amountDeducted={loa.amountDeducted}
+          amountPending={loa.amountPending}
+          deductionReason={loa.deductionReason}
+          onUpdate={handleFinancialUpdate}
+          loading={loading}
         />
       )}
     </div>

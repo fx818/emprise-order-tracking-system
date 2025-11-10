@@ -2,8 +2,8 @@
 > backend@1.0.0 dev
 > ts-node-dev --respawn --transpile-only src/index.ts
 
-[INFO] 11:35:07 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.7.3)
-(node:68030) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+[INFO] 16:50:57 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.7.3)
+(node:70751) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 Server is running on port 3000
 Environment: development
@@ -24,3 +24,24 @@ Routes initialized:
 - /api/tenders
 - /api/shipping-addresses
 - /api/emds
+[INFO] 17:07:15 Restarting: /Users/ayushsom/Documents/Prossima/emprise-order-tracking-system/backend/src/index.ts has been modified
+(node:75182) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[ERROR] 17:07:17 Error: listen EADDRINUSE: address already in use :::3000
+Uncaught exception: Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1912:16)
+    at listenInCluster (node:net:1969:12)
+    at Server.listen (node:net:2074:7)
+    at Function.listen (/Users/ayushsom/Documents/Prossima/emprise-order-tracking-system/backend/node_modules/express/lib/application.js:635:24)
+    at startServer (/Users/ayushsom/Documents/Prossima/emprise-order-tracking-system/backend/src/index.ts:299:7)
+    at Object.<anonymous> (/Users/ayushsom/Documents/Prossima/emprise-order-tracking-system/backend/src/index.ts:354:1)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1565:14)
+    at Module._compile (/Users/ayushsom/Documents/Prossima/emprise-order-tracking-system/backend/node_modules/source-map-support/source-map-support.js:568:25)
+    at Module.m._compile (/private/var/folders/72/sg2pqs496t1gfm26nmmvc_ch0000gn/T/ts-node-dev-hook-3259830061955933.js:69:33)
+    at node:internal/modules/cjs/loader:1708:10 {
+  code: 'EADDRINUSE',
+  errno: -48,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}

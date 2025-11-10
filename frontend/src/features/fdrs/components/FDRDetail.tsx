@@ -232,12 +232,12 @@ export function FDRDetail() {
             <p className="text-sm">{formatDate(fdr.maturityDate)}</p>
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">EMD Amount</p>
-            <p className="text-sm">{formatCurrency(fdr.emdAmount)}</p>
+            <p className="text-sm font-medium text-muted-foreground">Deposit Amount</p>
+            <p className="text-sm">{formatCurrency(fdr.depositAmount)}</p>
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">SD Amount</p>
-            <p className="text-sm">{formatCurrency(fdr.sdAmount)}</p>
+            <p className="text-sm font-medium text-muted-foreground">Maturity Value</p>
+            <p className="text-sm">{formatCurrency(fdr.maturityValue)}</p>
           </div>
         </CardContent>
       </Card>

@@ -2,7 +2,7 @@
 
 export interface CreateFdrDto {
   // Basic FDR/BG Information
-  category?: 'FD' | 'BG';
+  category?: 'SD' | 'PG' | 'FD' | 'BG';
   bankName?: string;
   accountNo?: string;
   fdrNumber?: string;
@@ -20,10 +20,6 @@ export interface CreateFdrDto {
   poc?: string;
   location?: string;
 
-  // Deposit Usage
-  emdAmount?: number;
-  sdAmount?: number;
-
   // Document
   documentFile?: Express.Multer.File;
   extractedData?: {
@@ -37,10 +33,8 @@ export interface CreateFdrDto {
     extractedText: string;
   };
 
-  // Relations - FDR can be linked to Offer, LOA, or Tender
+  // Relations - FDR can be linked to Offer only (LOA links to FDR, not vice versa)
   offerId?: string;
-  loaId?: string;
-  tenderId?: string;
 
   // Status
   status?: 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'RETURNED';

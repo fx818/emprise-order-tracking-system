@@ -205,14 +205,10 @@ Text: ${data.extractedText}`;
         contractDetails: dto.contractDetails,
         poc: dto.poc,
         location: dto.location,
-        emdAmount: dto.emdAmount,
-        sdAmount: dto.sdAmount,
         documentUrl,
         extractedData: dto.extractedData,
         status: dto.status || 'RUNNING',
         offerId: dto.offerId,
-        loaId: dto.loaId,
-        tenderId: dto.tenderId,
         tags,
       });
 
@@ -249,11 +245,9 @@ Text: ${data.extractedText}`;
    */
   async getAllFdrs(params: {
     searchTerm?: string;
-    category?: 'FD' | 'BG';
+    category?: 'SD' | 'PG' | 'FD' | 'BG';
     status?: FDRStatus;
     offerId?: string;
-    loaId?: string;
-    tenderId?: string;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -275,8 +269,6 @@ Text: ${data.extractedText}`;
           category: params.category,
           status: params.status,
           offerId: params.offerId,
-          loaId: params.loaId,
-          tenderId: params.tenderId,
         }),
       ]);
 
@@ -341,14 +333,10 @@ Text: ${data.extractedText}`;
       if (dto.contractDetails !== undefined) updateData.contractDetails = dto.contractDetails;
       if (dto.poc !== undefined) updateData.poc = dto.poc;
       if (dto.location !== undefined) updateData.location = dto.location;
-      if (dto.emdAmount !== undefined) updateData.emdAmount = dto.emdAmount;
-      if (dto.sdAmount !== undefined) updateData.sdAmount = dto.sdAmount;
       if (documentUrl) updateData.documentUrl = documentUrl;
       if (dto.extractedData) updateData.extractedData = dto.extractedData;
       if (dto.status) updateData.status = dto.status;
       if (dto.offerId !== undefined) updateData.offerId = dto.offerId;
-      if (dto.loaId !== undefined) updateData.loaId = dto.loaId;
-      if (dto.tenderId !== undefined) updateData.tenderId = dto.tenderId;
       if (tags) updateData.tags = tags;
 
       const updatedFdr = await this.repository.update(id, updateData);

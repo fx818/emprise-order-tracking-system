@@ -12,9 +12,27 @@ export class PrismaTenderRepository {
       description: prismaTender.description,
       hasEMD: prismaTender.hasEMD,
       emdAmount: prismaTender.emdAmount,
+      emdBankName: prismaTender.emdBankName,
+      emdSubmissionDate: prismaTender.emdSubmissionDate,
+      emdMaturityDate: prismaTender.emdMaturityDate,
+      emdDocumentUrl: prismaTender.emdDocumentUrl,
+      emdReturnStatus: prismaTender.emdReturnStatus,
+      emdReturnDate: prismaTender.emdReturnDate,
+      emdReturnAmount: prismaTender.emdReturnAmount,
       status: prismaTender.status,
       documentUrl: prismaTender.documentUrl,
+      nitDocumentUrl: prismaTender.nitDocumentUrl,
       tags: prismaTender.tags || [],
+      siteId: prismaTender.siteId,
+      site: prismaTender.site ? {
+        id: prismaTender.site.id,
+        name: prismaTender.site.name,
+        code: prismaTender.site.code,
+        zone: prismaTender.site.zone ? {
+          id: prismaTender.site.zone.id,
+          name: prismaTender.site.zone.name
+        } : undefined
+      } : undefined,
       createdAt: prismaTender.createdAt,
       updatedAt: prismaTender.updatedAt
     };
@@ -39,9 +57,23 @@ export class PrismaTenderRepository {
         description: tender.description,
         hasEMD: tender.hasEMD,
         emdAmount: tender.emdAmount,
+        emdBankName: tender.emdBankName || null,
+        emdSubmissionDate: tender.emdSubmissionDate || null,
+        emdMaturityDate: tender.emdMaturityDate || null,
+        emdDocumentUrl: tender.emdDocumentUrl || null,
+        emdReturnStatus: tender.emdReturnStatus || null,
         status: tender.status,
         documentUrl: tender.documentUrl,
-        tags: tags
+        nitDocumentUrl: tender.nitDocumentUrl || null,
+        tags: tags,
+        siteId: tender.siteId || null
+      },
+      include: {
+        site: {
+          include: {
+            zone: true
+          }
+        }
       }
     });
 
@@ -60,17 +92,36 @@ export class PrismaTenderRepository {
       }
     }
 
+    // Build update data object with only defined fields
+    const updateData: any = {};
+
+    if (tender.tenderNumber !== undefined) updateData.tenderNumber = tender.tenderNumber;
+    if (tender.dueDate !== undefined) updateData.dueDate = tender.dueDate;
+    if (tender.description !== undefined) updateData.description = tender.description;
+    if (tender.hasEMD !== undefined) updateData.hasEMD = tender.hasEMD;
+    if (tender.emdAmount !== undefined) updateData.emdAmount = tender.emdAmount;
+    if (tender.emdBankName !== undefined) updateData.emdBankName = tender.emdBankName;
+    if (tender.emdSubmissionDate !== undefined) updateData.emdSubmissionDate = tender.emdSubmissionDate;
+    if (tender.emdMaturityDate !== undefined) updateData.emdMaturityDate = tender.emdMaturityDate;
+    if (tender.emdDocumentUrl !== undefined) updateData.emdDocumentUrl = tender.emdDocumentUrl;
+    if (tender.emdReturnStatus !== undefined) updateData.emdReturnStatus = tender.emdReturnStatus;
+    if (tender.emdReturnDate !== undefined) updateData.emdReturnDate = tender.emdReturnDate;
+    if (tender.emdReturnAmount !== undefined) updateData.emdReturnAmount = tender.emdReturnAmount;
+    if (tender.status !== undefined) updateData.status = tender.status;
+    if (tender.documentUrl !== undefined) updateData.documentUrl = tender.documentUrl;
+    if (tender.nitDocumentUrl !== undefined) updateData.nitDocumentUrl = tender.nitDocumentUrl;
+    if (tender.siteId !== undefined) updateData.siteId = tender.siteId;
+    if (tags !== undefined) updateData.tags = tags;
+
     const updated = await this.prisma.tender.update({
       where: { id },
-      data: {
-        tenderNumber: tender.tenderNumber,
-        dueDate: tender.dueDate,
-        description: tender.description,
-        hasEMD: tender.hasEMD,
-        emdAmount: tender.emdAmount,
-        status: tender.status,
-        documentUrl: tender.documentUrl,
-        tags: tags
+      data: updateData,
+      include: {
+        site: {
+          include: {
+            zone: true
+          }
+        }
       }
     });
 
@@ -85,7 +136,14 @@ export class PrismaTenderRepository {
 
   async findById(id: string): Promise<Tender | null> {
     const tender = await this.prisma.tender.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        site: {
+          include: {
+            zone: true
+          }
+        }
+      }
     });
 
     return tender ? this.toDomainEntity(tender) : null;
@@ -93,7 +151,14 @@ export class PrismaTenderRepository {
 
   async findByTenderNumber(tenderNumber: string): Promise<Tender | null> {
     const tender = await this.prisma.tender.findUnique({
-      where: { tenderNumber }
+      where: { tenderNumber },
+      include: {
+        site: {
+          include: {
+            zone: true
+          }
+        }
+      }
     });
 
     return tender ? this.toDomainEntity(tender) : null;

@@ -15,16 +15,24 @@ export interface CreateLoaDto {
     siteId: string;
     remarks?: string;
     tenderNo?: string;
+    tenderId?: string;
     orderPOC?: string;
+    pocId?: string;
+    inspectionAgencyId?: string;
     fdBgDetails?: string;
     hasEmd?: boolean;
     emdAmount?: number;
-    hasSecurityDeposit?: boolean;
-    securityDepositAmount?: number;
-    securityDepositFile?: Express.Multer.File;
-    hasPerformanceGuarantee?: boolean;
-    performanceGuaranteeAmount?: number;
-    performanceGuaranteeFile?: Express.Multer.File;
+    // FDR linking - link existing FDR records
+    hasSd?: boolean;
+    sdFdrId?: string;
+    hasPg?: boolean;
+    pgFdrId?: string;
+    receivablePending?: number;
+    // Warranty fields
+    warrantyPeriodMonths?: number;
+    warrantyPeriodYears?: number;
+    warrantyStartDate?: string;
+    warrantyEndDate?: string;
     // Billing/Invoice fields
     invoiceNumber?: string;
     invoiceAmount?: number;

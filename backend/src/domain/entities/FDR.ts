@@ -4,7 +4,7 @@ export interface FDR {
   id: string;
 
   // Basic FDR/BG Information
-  category: 'FD' | 'BG';
+  category: 'SD' | 'PG' | 'FD' | 'BG';
   bankName: string;
   accountNo?: string;
   fdrNumber?: string;
@@ -22,10 +22,6 @@ export interface FDR {
   poc?: string;
   location?: string;
 
-  // Deposit Usage
-  emdAmount?: number;
-  sdAmount?: number;
-
   // Document
   documentUrl?: string;
   extractedData?: any;
@@ -35,8 +31,6 @@ export interface FDR {
 
   // Relations
   offerId?: string;
-  loaId?: string;
-  tenderId?: string;
 
   tags: string[];
   createdAt: Date;

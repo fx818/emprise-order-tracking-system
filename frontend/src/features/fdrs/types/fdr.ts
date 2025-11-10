@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const fdrSchema = z.object({
-  category: z.enum(['FD', 'BG']).default('FD'),
+  category: z.enum(['SD', 'PG', 'FD', 'BG']).default('FD'),
   bankName: z.string().min(1, 'Bank name is required').default('IDBI'),
   accountNo: z.string().optional(),
   fdrNumber: z.string().optional(),
@@ -14,12 +14,8 @@ export const fdrSchema = z.object({
   contractDetails: z.string().optional(),
   poc: z.string().optional(),
   location: z.string().optional(),
-  emdAmount: z.number().optional(),
-  sdAmount: z.number().optional(),
   status: z.enum(['RUNNING', 'COMPLETED', 'CANCELLED', 'RETURNED']).optional(),
   offerId: z.string().optional(),
-  loaId: z.string().optional(),
-  tenderId: z.string().optional(),
   tags: z.array(z.string()).default(['FD']),
   documentFile: z.any().optional() // We'll handle file validation separately
 });
@@ -30,7 +26,7 @@ export interface FDR {
   id: string;
 
   // Basic FDR/BG Information
-  category: 'FD' | 'BG';
+  category: 'SD' | 'PG' | 'FD' | 'BG';
   bankName: string;
   accountNo?: string;
   fdrNumber?: string;
@@ -47,10 +43,6 @@ export interface FDR {
   contractDetails?: string;
   poc?: string;
   location?: string;
-
-  // Deposit Usage
-  emdAmount?: number;
-  sdAmount?: number;
 
   // Document
   documentUrl?: string;
@@ -75,19 +67,6 @@ export interface FDR {
     subject: string;
   };
   offerId?: string;
-
-  tender?: {
-    id: string;
-    tenderNumber: string;
-    description: string;
-  };
-  tenderId?: string;
-
-  loa?: {
-    id: string;
-    loaNumber: string;
-  };
-  loaId?: string;
 
   tags: string[];
   createdAt: string;

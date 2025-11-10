@@ -32,15 +32,11 @@ export class FdrController {
         contractDetails: req.body.contractDetails,
         poc: req.body.poc,
         location: req.body.location,
-        emdAmount: req.body.emdAmount ? parseFloat(req.body.emdAmount) : undefined,
-        sdAmount: req.body.sdAmount ? parseFloat(req.body.sdAmount) : undefined,
         documentFile: req.file,
         extractedData: req.body.extractedData ? JSON.parse(req.body.extractedData) : undefined,
         status: req.body.status as FDRStatus,
         // Filter out empty strings, "undefined" string, and whitespace
         offerId: req.body.offerId && req.body.offerId.trim() !== '' && req.body.offerId !== 'undefined' ? req.body.offerId : undefined,
-        loaId: req.body.loaId && req.body.loaId.trim() !== '' && req.body.loaId !== 'undefined' ? req.body.loaId : undefined,
-        tenderId: req.body.tenderId && req.body.tenderId.trim() !== '' && req.body.tenderId !== 'undefined' ? req.body.tenderId : undefined,
         tags: req.body.tags,
       };
 
@@ -163,14 +159,10 @@ export class FdrController {
         contractDetails: req.body.contractDetails,
         poc: req.body.poc,
         location: req.body.location,
-        emdAmount: req.body.emdAmount ? parseFloat(req.body.emdAmount) : undefined,
-        sdAmount: req.body.sdAmount ? parseFloat(req.body.sdAmount) : undefined,
         documentFile: req.file,
         extractedData: req.body.extractedData ? JSON.parse(req.body.extractedData) : undefined,
         status: req.body.status as FDRStatus,
         offerId: req.body.offerId,
-        loaId: req.body.loaId,
-        tenderId: req.body.tenderId,
         tags: req.body.tags,
       };
 

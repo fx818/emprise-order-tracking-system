@@ -39,7 +39,8 @@ export const errorHandler = (
       errors: error.errors,
       ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
     };
-    return res.status(error.statusCode).json(response);
+    res.status(error.statusCode).json(response);
+    return;
   }
 
   // Handle Prisma errors
@@ -51,28 +52,32 @@ export const errorHandler = (
           message: 'A record with this data already exists',
           code: 'UNIQUE_CONSTRAINT_VIOLATION'
         };
-        return res.status(409).json(response);
+        res.status(409).json(response);
+        return;
       case 'P2014': // Invalid ID
         response = {
           status: 'error',
           message: 'Invalid ID provided',
           code: 'INVALID_ID'
         };
-        return res.status(400).json(response);
+        res.status(400).json(response);
+        return;
       case 'P2003': // Foreign key constraint violation
         response = {
           status: 'error',
           message: 'Related record not found',
           code: 'FOREIGN_KEY_VIOLATION'
         };
-        return res.status(400).json(response);
+        res.status(400).json(response);
+        return;
       default:
         response = {
           status: 'error',
           message: 'Database operation failed',
           code: 'DATABASE_ERROR'
         };
-        return res.status(500).json(response);
+        res.status(500).json(response);
+        return;
     }
   }
 
@@ -97,7 +102,8 @@ export const errorHandler = (
       message: error instanceof TokenExpiredError ? 'Token has expired' : 'Invalid token',
       code: 'INVALID_TOKEN'
     };
-    return res.status(401).json(response);
+    res.status(401).json(response);
+    return;
   }
 
   // Handle Multer errors
@@ -107,7 +113,8 @@ export const errorHandler = (
       message: error.message,
       code: 'FILE_UPLOAD_ERROR'
     };
-    return res.status(400).json(response);
+    res.status(400).json(response);
+    return;
   }
 
   // Handle validation errors from express-validator
@@ -118,7 +125,8 @@ export const errorHandler = (
       code: 'VALIDATION_ERROR',
       errors: [error.message]
     };
-    return res.status(400).json(response);
+    res.status(400).json(response);
+    return;
   }
 
   // Handle file size error
@@ -128,7 +136,8 @@ export const errorHandler = (
       message: 'File size too large',
       code: 'FILE_TOO_LARGE'
     };
-    return res.status(413).json(response);
+    res.status(413).json(response);
+    return;
   }
 
   // Only include stack trace in development

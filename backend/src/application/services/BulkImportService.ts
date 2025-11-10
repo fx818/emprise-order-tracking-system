@@ -175,9 +175,9 @@ export class BulkImportService {
       tenderNo: this.parseStringValue(row['Tender No.']),
       orderPOC: this.parseStringValue(row['Order POC']),
       fdBgDetails: this.parseStringValue(row['FD/BG Details']),
-      // Billing fields
-      lastInvoiceNo: this.parseStringValue(row['Last Invoice No.']),
-      lastInvoiceAmount: this.parseNumber(row['Last Invoice Amount']),
+      // Billing fields (try multiple column name variations)
+      lastInvoiceNo: this.parseStringValue(row['Last Invoice No.'] || row['Last Invoice No'] || row['Last Invoice Number']),
+      lastInvoiceAmount: this.parseNumber(row['Last Invoice Amount'] || row['Last Invoice Value']),
       totalReceivables: this.parseNumber(row['Total Receivables '] || row['Total Receivables']),
       actualAmountReceived: this.parseNumber(row['Actual Amount Received']),
       amountDeducted: this.parseNumber(row['Amount Deducted']),
@@ -252,6 +252,34 @@ export class BulkImportService {
     }
 
     return newCustomer.id;
+  }
+
+  /**
+   * Find or create POC with case-insensitive matching
+   */
+  private async findOrCreatePoc(pocName: string): Promise<string> {
+    const normalizedName = this.normalizeString(pocName);
+
+    // Try to find existing POC with case-insensitive match on name
+    const existingPocs = await this.prisma.pOC.findMany();
+    const matchingPoc = existingPocs.find(
+      p => this.normalizeString(p.name) === normalizedName
+    );
+
+    if (matchingPoc) {
+      console.log(`Found existing POC: ${matchingPoc.name} (ID: ${matchingPoc.id})`);
+      return matchingPoc.id;
+    }
+
+    // Create new POC if not found (use original case from Excel)
+    const newPoc = await this.prisma.pOC.create({
+      data: {
+        name: pocName.trim()
+      }
+    });
+
+    console.log(`Created new POC: ${newPoc.name} (ID: ${newPoc.id})`);
+    return newPoc.id;
   }
 
   /**
@@ -530,14 +558,27 @@ export class BulkImportService {
           // Map status
           const status = this.mapStatus(row.orderStatus);
 
+          // Get or create POC if orderPOC is provided
+          let pocId: string | null = null;
+          if (row.orderPOC) {
+            try {
+              pocId = await this.findOrCreatePoc(row.orderPOC);
+            } catch (error) {
+              console.warn(`Warning: Could not create POC '${row.orderPOC}':`, error);
+              // Continue without POC if creation fails
+            }
+          }
+
           // Create LOA with Invoice in a transaction
-          const createdLoa = await this.prisma.$transaction(async (tx) => {
-            // Create LOA
+          const createdLoa = await this.prisma.$transaction(async (tx): Promise<any> => {
+            // Create LOA with LOA-level billing fields
             const loa = await tx.lOA.create({
               data: {
                 loaNumber: row.loaNumber,
                 loaValue: row.orderValue,
-                siteId: siteId,
+                site: {
+                  connect: { id: siteId }
+                },
                 deliveryPeriod: {
                   start: deliveryPeriodStart.toISOString(),
                   end: deliveryPeriodEnd.toISOString()
@@ -551,45 +592,39 @@ export class BulkImportService {
                 remarks: row.remarks || null, // Map remarks from Excel to LOA remarks
                 hasEmd: !!row.emd,
                 emdAmount: row.emd,
-                hasSecurityDeposit: !!row.securityDeposit,
-                securityDepositAmount: row.securityDeposit,
-                hasPerformanceGuarantee: !!row.performanceGuarantee,
-                performanceGuaranteeAmount: row.performanceGuarantee,
                 // New fields from bulk import
                 tenderNo: row.tenderNo || null,
-                orderPOC: row.orderPOC || null,
+                ...(pocId && { poc: { connect: { id: pocId } } }), // Link to POC table via relation
                 fdBgDetails: row.fdBgDetails || null,
                 daysToDueDateFromExcel: this.parseDaysToDueDate(row.daysToDueDate),
+                // LOA-level billing fields (total across all bills)
+                actualAmountReceived: row.actualAmountReceived,
+                amountDeducted: row.amountDeducted,
+                amountPending: row.amountPending,
+                deductionReason: row.reasonForDeduction,
               },
               include: {
                 site: true
               }
             });
 
-            // Create Invoice if any billing data exists
-            const hasBillingData = row.lastInvoiceNo ||
-                                   row.lastInvoiceAmount ||
-                                   row.totalReceivables ||
-                                   row.actualAmountReceived ||
-                                   row.amountDeducted ||
-                                   row.amountPending ||
-                                   row.reasonForDeduction ||
-                                   row.billLinks;
+            // Create Bill/Invoice for last invoice details if ANY invoice data exists
+            const hasBillingData = row.lastInvoiceNo || row.lastInvoiceAmount || row.billLinks;
 
             if (hasBillingData) {
+              console.log(`Creating bill for LOA ${row.loaNumber}: Invoice No="${row.lastInvoiceNo || 'N/A'}", Amount=${row.lastInvoiceAmount || 0}`);
               await tx.invoice.create({
                 data: {
                   loaId: loa.id,
-                  invoiceNumber: row.lastInvoiceNo,
-                  invoiceAmount: row.lastInvoiceAmount,
-                  totalReceivables: row.totalReceivables,
-                  actualAmountReceived: row.actualAmountReceived,
-                  amountDeducted: row.amountDeducted,
-                  amountPending: row.amountPending,
-                  deductionReason: row.reasonForDeduction,
-                  billLinks: row.billLinks,
+                  invoiceNumber: row.lastInvoiceNo || null,
+                  invoiceAmount: row.lastInvoiceAmount || null,
+                  billLinks: row.billLinks || null,
+                  // Set status based on LOA-level payment status
+                  status: row.actualAmountReceived ? 'PAYMENT_MADE' : 'REGISTERED',
                 }
               });
+            } else {
+              console.log(`No billing data found for LOA ${row.loaNumber}, skipping bill creation`);
             }
 
             return loa;

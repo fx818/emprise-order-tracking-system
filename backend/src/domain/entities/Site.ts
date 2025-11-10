@@ -9,6 +9,11 @@ export interface Site {
   code: string;
   location: string;
   zoneId: string;
+  zone?: {
+    id: string;
+    name: string;
+    headquarters: string;
+  };
   address: string;
   contactPerson?: string;
   contactPhone?: string;

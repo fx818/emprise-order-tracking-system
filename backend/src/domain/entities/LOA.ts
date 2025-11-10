@@ -10,29 +10,66 @@ export interface LOA {
     dueDate?: Date;
     orderReceivedDate?: Date;
     status?: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'DELAYED';
-    site: {
+    site?: {
         id: string;
         name: string;
         code: string;
         zoneId: string;
+        zone?: {
+            id: string;
+            name: string;
+            headquarters: string;
+        };
     };
     siteId: string;
     workDescription: string;
     documentUrl: string;
     amendments?: Amendment[];
     invoices?: any[]; // Invoice records for billing
+    otherDocuments?: OtherDocument[];
     remarks?: string;
     tenderNo?: string;
     orderPOC?: string;
+    pocId?: string;
+    poc?: {
+        id: string;
+        name: string;
+    };
+    inspectionAgencyId?: string;
+    inspectionAgency?: {
+        id: string;
+        name: string;
+    };
     fdBgDetails?: string;
     hasEmd: boolean;
     emdAmount?: number;
-    hasSecurityDeposit: boolean;
-    securityDepositAmount?: number;
-    securityDepositDocumentUrl?: string;
-    hasPerformanceGuarantee: boolean;
-    performanceGuaranteeAmount?: number;
-    performanceGuaranteeDocumentUrl?: string;
+    hasSd: boolean;
+    sdFdrId?: string;
+    hasPg: boolean;
+    pgFdrId?: string;
+    receivablePending?: number;
+    actualAmountReceived?: number;
+    amountDeducted?: number;
+    amountPending?: number;
+    deductionReason?: string;
+    sdFdr?: {
+        id: string;
+        bankName: string;
+        depositAmount: number;
+        dateOfDeposit: Date;
+        maturityDate?: Date;
+        status: string;
+        category: string;
+    };
+    pgFdr?: {
+        id: string;
+        bankName: string;
+        depositAmount: number;
+        dateOfDeposit: Date;
+        maturityDate?: Date;
+        status: string;
+        category: string;
+    };
     tags: string[];
     createdAt: Date;
     updatedAt: Date;
@@ -45,6 +82,16 @@ export interface Amendment {
     loaId: string;
     loa?: LOA;
     tags: string[];
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface OtherDocument {
+    id: string;
+    title: string;
+    documentUrl: string;
+    loaId: string;
+    loa?: LOA;
     createdAt: Date;
     updatedAt: Date;
 }

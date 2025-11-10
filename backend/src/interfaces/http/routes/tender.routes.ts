@@ -174,7 +174,8 @@ const upload = multer({
 
 const uploadFields = upload.fields([
   { name: 'documentFile', maxCount: 1 },
-  { name: 'nitDocumentFile', maxCount: 1 }
+  { name: 'nitDocumentFile', maxCount: 1 },
+  { name: 'emdDocumentFile', maxCount: 1 }
 ]);
 
 export function tenderRoutes(controller: TenderController) {
@@ -210,6 +211,11 @@ export function tenderRoutes(controller: TenderController) {
   router.patch('/:id/status',
     authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
     controller.updateStatus
+  );
+
+  router.patch('/:id/emd-return-status',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
+    controller.updateEMDReturnStatus
   );
 
   return router;

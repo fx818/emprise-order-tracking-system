@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "BillStatus" AS ENUM ('REGISTERED', 'RETURNED', 'PAYMENT_MADE');
+
+-- AlterTable
+ALTER TABLE "Invoice" ADD COLUMN "status" "BillStatus" NOT NULL DEFAULT 'REGISTERED';

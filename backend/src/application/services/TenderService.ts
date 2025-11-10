@@ -1,9 +1,10 @@
 import { PrismaTenderRepository } from '../../infrastructure/persistence/repositories/PrismaTenderRepository';
+import { PrismaLoaRepository } from '../../infrastructure/persistence/repositories/PrismaLoaRepository';
 import { S3Service } from '../../infrastructure/services/S3Service';
 import { CreateTenderDto } from '../dtos/tender/CreateTenderDto';
 import { UpdateTenderDto } from '../dtos/tender/UpdateTenderDto';
 import { TenderResponseDto } from '../dtos/tender/TenderResponseDto';
-import { TenderStatus } from '@prisma/client';
+import { TenderStatus, EMDReturnStatus } from '@prisma/client';
 import { AppError } from '../../shared/errors/AppError';
 import { Tender } from '../../domain/entities/Tender';
 
@@ -16,6 +17,7 @@ interface ServiceResult<T> {
 export class TenderService {
   constructor(
     private repository: PrismaTenderRepository,
+    private loaRepository: PrismaLoaRepository,
     private s3Service: S3Service
   ) {}
 
@@ -29,6 +31,7 @@ export class TenderService {
 
       let documentUrl: string | undefined;
       let nitDocumentUrl: string | undefined;
+      let emdDocumentUrl: string | undefined;
 
       // If document file is provided, upload to S3
       if (dto.documentFile) {
@@ -70,12 +73,43 @@ export class TenderService {
         }
       }
 
+      // If EMD document file is provided, upload to S3
+      if (dto.emdDocumentFile) {
+        try {
+          const filename = `${dto.tenderNumber}-emd-${Date.now().toString()}`;
+          const uploadResult = await this.s3Service.uploadFile(
+            filename,
+            dto.emdDocumentFile.buffer,
+            dto.emdDocumentFile.mimetype
+          );
+          emdDocumentUrl = uploadResult;
+        } catch (uploadError) {
+          console.error('Error uploading EMD document file to S3:', uploadError);
+          // Clean up previously uploaded files
+          if (documentUrl) {
+            try {
+              await this.s3Service.deleteFile(documentUrl);
+            } catch (deleteError) {
+              console.error('Failed to delete tender document:', deleteError);
+            }
+          }
+          if (nitDocumentUrl) {
+            try {
+              await this.s3Service.deleteFile(nitDocumentUrl);
+            } catch (deleteError) {
+              console.error('Failed to delete NIT document:', deleteError);
+            }
+          }
+          throw new AppError('Failed to upload EMD document file', 500);
+        }
+      }
+
       try {
         // Ensure proper type conversion for all fields
-        const hasEMD = typeof dto.hasEMD === 'string' 
-          ? (dto.hasEMD as string).toLowerCase() === 'true' 
+        const hasEMD = typeof dto.hasEMD === 'string'
+          ? (dto.hasEMD as string).toLowerCase() === 'true'
           : !!dto.hasEMD;
-        
+
         let emdAmount: number | undefined = undefined;
         if (hasEMD && dto.emdAmount !== undefined && dto.emdAmount !== null) {
           emdAmount = typeof dto.emdAmount === 'string'
@@ -89,10 +123,16 @@ export class TenderService {
           description: dto.description,
           hasEMD,
           emdAmount,
+          emdBankName: dto.emdBankName,
+          emdSubmissionDate: dto.emdSubmissionDate ? (typeof dto.emdSubmissionDate === 'string' ? new Date(dto.emdSubmissionDate) : dto.emdSubmissionDate) : undefined,
+          emdMaturityDate: dto.emdMaturityDate ? (typeof dto.emdMaturityDate === 'string' ? new Date(dto.emdMaturityDate) : dto.emdMaturityDate) : undefined,
+          emdDocumentUrl,
+          emdReturnStatus: hasEMD ? EMDReturnStatus.PENDING : undefined,
           status: dto.status || TenderStatus.ACTIVE,
           documentUrl,
           nitDocumentUrl,
-          tags: dto.tags || []
+          tags: dto.tags || [],
+          siteId: dto.siteId
         });
 
         return this.mapToResponseDto(tender);
@@ -111,6 +151,13 @@ export class TenderService {
             await this.s3Service.deleteFile(nitDocumentUrl);
           } catch (deleteError) {
             console.error('Failed to delete NIT document after tender creation error:', deleteError);
+          }
+        }
+        if (emdDocumentUrl) {
+          try {
+            await this.s3Service.deleteFile(emdDocumentUrl);
+          } catch (deleteError) {
+            console.error('Failed to delete EMD document after tender creation error:', deleteError);
           }
         }
         throw new AppError('Failed to create tender in database', 500);
@@ -133,6 +180,7 @@ export class TenderService {
 
       let documentUrl = tender.documentUrl;
       let nitDocumentUrl = tender.nitDocumentUrl;
+      let emdDocumentUrl = tender.emdDocumentUrl;
 
       // If tender document file is provided, upload to S3
       if (dto.documentFile) {
@@ -166,6 +214,22 @@ export class TenderService {
         nitDocumentUrl = uploadResult;
       }
 
+      // If EMD document file is provided, upload to S3
+      if (dto.emdDocumentFile) {
+        // Delete old EMD document if exists
+        if (tender.emdDocumentUrl) {
+          await this.s3Service.deleteFile(tender.emdDocumentUrl);
+        }
+
+        const filename = `${tender.tenderNumber}-emd-${Date.now().toString()}`;
+        const uploadResult = await this.s3Service.uploadFile(
+          filename,
+          dto.emdDocumentFile.buffer,
+          dto.emdDocumentFile.mimetype
+        );
+        emdDocumentUrl = uploadResult;
+      }
+
       // If tenderNumber is changed, check if new tenderNumber is unique
       if (dto.tenderNumber && dto.tenderNumber !== tender.tenderNumber) {
         const existingTender = await this.repository.findByTenderNumber(dto.tenderNumber);
@@ -175,12 +239,12 @@ export class TenderService {
       }
 
       // Ensure proper type conversion for all fields
-      const hasEMD = dto.hasEMD !== undefined 
-        ? (typeof dto.hasEMD === 'string' 
-            ? (dto.hasEMD as string).toLowerCase() === 'true' 
+      const hasEMD = dto.hasEMD !== undefined
+        ? (typeof dto.hasEMD === 'string'
+            ? (dto.hasEMD as string).toLowerCase() === 'true'
             : !!dto.hasEMD)
         : tender.hasEMD;
-      
+
       // Convert emdAmount properly
       let emdAmount: number | undefined = undefined;
       if (hasEMD) {
@@ -193,16 +257,32 @@ export class TenderService {
         }
       }
 
+      // Convert emdReturnAmount if provided
+      let emdReturnAmount: number | undefined = undefined;
+      if (dto.emdReturnAmount !== undefined && dto.emdReturnAmount !== null) {
+        emdReturnAmount = typeof dto.emdReturnAmount === 'string'
+          ? parseFloat(dto.emdReturnAmount)
+          : dto.emdReturnAmount;
+      }
+
       const updatedTender = await this.repository.update(id, {
         tenderNumber: dto.tenderNumber,
         dueDate: dto.dueDate ? (typeof dto.dueDate === 'string' ? new Date(dto.dueDate) : dto.dueDate) : undefined,
         description: dto.description,
         hasEMD,
         emdAmount,
+        emdBankName: dto.emdBankName,
+        emdSubmissionDate: dto.emdSubmissionDate ? (typeof dto.emdSubmissionDate === 'string' ? new Date(dto.emdSubmissionDate) : dto.emdSubmissionDate) : undefined,
+        emdMaturityDate: dto.emdMaturityDate ? (typeof dto.emdMaturityDate === 'string' ? new Date(dto.emdMaturityDate) : dto.emdMaturityDate) : undefined,
+        emdDocumentUrl,
+        emdReturnStatus: dto.emdReturnStatus,
+        emdReturnDate: dto.emdReturnDate ? (typeof dto.emdReturnDate === 'string' ? new Date(dto.emdReturnDate) : dto.emdReturnDate) : undefined,
+        emdReturnAmount,
         status: dto.status,
         documentUrl,
         nitDocumentUrl,
-        tags: dto.tags
+        tags: dto.tags,
+        siteId: dto.siteId
       });
 
       return this.mapToResponseDto(updatedTender);
@@ -219,6 +299,15 @@ export class TenderService {
       const tender = await this.repository.findById(id);
       if (!tender) {
         throw new AppError('Tender not found', 404);
+      }
+
+      // Check if tender has associated LOAs
+      const associatedLoas = await this.loaRepository.findAll({ tenderId: id });
+      if (associatedLoas.length > 0) {
+        throw new AppError(
+          `Cannot delete tender: ${associatedLoas.length} LOA(s) are associated with this tender. Please remove LOA associations first.`,
+          400
+        );
       }
 
       // Delete documents from S3 if exists
@@ -295,6 +384,55 @@ export class TenderService {
     }
   }
 
+  async updateEMDReturnStatus(
+    id: string,
+    emdReturnStatus: EMDReturnStatus,
+    emdReturnDate?: Date,
+    emdReturnAmount?: number
+  ): Promise<TenderResponseDto> {
+    try {
+      const tender = await this.repository.findById(id);
+      if (!tender) {
+        throw new AppError('Tender not found', 404);
+      }
+
+      if (!tender.hasEMD) {
+        throw new AppError('This tender does not have EMD', 400);
+      }
+
+      const updatedTender = await this.repository.update(id, {
+        emdReturnStatus,
+        emdReturnDate,
+        emdReturnAmount
+      });
+
+      return this.mapToResponseDto(updatedTender);
+    } catch (error) {
+      console.error('Error in updateEMDReturnStatus:', error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Failed to update EMD return status', 500);
+    }
+  }
+
+  async getLoasForTender(tenderId: string) {
+    try {
+      const tender = await this.repository.findById(tenderId);
+      if (!tender) {
+        throw new AppError('Tender not found', 404);
+      }
+
+      const loas = await this.loaRepository.findAll({ tenderId });
+      return loas;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Failed to get LOAs for tender', 500);
+    }
+  }
+
   private mapToResponseDto(tender: Tender): TenderResponseDto {
     return {
       id: tender.id,
@@ -303,10 +441,19 @@ export class TenderService {
       description: tender.description,
       hasEMD: tender.hasEMD,
       emdAmount: tender.emdAmount,
+      emdBankName: tender.emdBankName,
+      emdSubmissionDate: tender.emdSubmissionDate,
+      emdMaturityDate: tender.emdMaturityDate,
+      emdDocumentUrl: tender.emdDocumentUrl,
+      emdReturnStatus: tender.emdReturnStatus,
+      emdReturnDate: tender.emdReturnDate,
+      emdReturnAmount: tender.emdReturnAmount,
       status: tender.status,
       documentUrl: tender.documentUrl,
       nitDocumentUrl: tender.nitDocumentUrl,
       tags: tender.tags,
+      siteId: tender.siteId,
+      site: tender.site,
       createdAt: tender.createdAt,
       updatedAt: tender.updatedAt
     };

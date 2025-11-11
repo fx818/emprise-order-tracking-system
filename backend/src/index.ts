@@ -103,17 +103,20 @@ async function startServer() {
   // Initialize Prisma clieant
   const prisma = new PrismaClient();
 
-  // Global middleware
-  app.use(express.json());
-  
-  // Configure CORS to allow requests from the frontend
+  // CORS must be first - before any other middleware
   app.use(cors({
-   origin: ['https://emprise.prossimatech.com', 'https://www.emprise.prossimatech.com', "https://client.prossimatech.com" ,'http://localhost:5173'],
+    origin: ['https://emprise.prossimatech.com', 'https://www.emprise.prossimatech.com', "https://client.prossimatech.com" ,'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range']
   }));
-  
+
+  // Handle preflight requests explicitly
+  app.options('*', cors());
+
+  // Global middleware
+  app.use(express.json());
   app.use(helmet());
 
   // Initialize services

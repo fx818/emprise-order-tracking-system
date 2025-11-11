@@ -17,8 +17,8 @@ export class LoaValidator {
     // LOA Number validation
     if (!dto.loaNumber?.trim()) {
       errors.push({ field: 'loaNumber', message: 'LOA number is required' });
-    } else if (dto.loaNumber.length < 3 || dto.loaNumber.length > 50) {
-      errors.push({ field: 'loaNumber', message: 'LOA number must be between 3 and 50 characters' });
+    } else if (dto.loaNumber.length < 3 || dto.loaNumber.length > 200) {
+      errors.push({ field: 'loaNumber', message: 'LOA number must be between 3 and 200 characters' });
     }
 
     if (!dto.siteId) {

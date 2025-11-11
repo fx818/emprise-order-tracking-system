@@ -49,9 +49,35 @@ export class DashboardController {
       res.json({ status: 'success', data: offersByStatus });
     } catch (error) {
       console.error('Offers By Status Error:', error);
-      res.status(500).json({ 
-        status: 'error', 
-        message: 'Failed to fetch offers by status' 
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to fetch offers by status'
+      });
+    }
+  };
+
+  getDispatchDueMetrics = async (req: Request, res: Response) => {
+    try {
+      const metrics = await this.dashboardService.getDispatchDueMetrics();
+      res.json({ status: 'success', data: metrics });
+    } catch (error) {
+      console.error('Dispatch Due Metrics Error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to fetch dispatch due metrics'
+      });
+    }
+  };
+
+  getProcessingTimeMetrics = async (req: Request, res: Response) => {
+    try {
+      const metrics = await this.dashboardService.getProcessingTimeMetrics();
+      res.json({ status: 'success', data: metrics });
+    } catch (error) {
+      console.error('Processing Time Metrics Error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to fetch processing time metrics'
       });
     }
   };

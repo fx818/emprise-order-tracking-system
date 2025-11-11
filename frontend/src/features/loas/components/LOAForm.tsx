@@ -1144,7 +1144,7 @@ export function LOAForm({
                 </PopoverContent>
               </Popover>
               <FormDescription>
-                Link this LOA to an active tender. EMD details will be auto-populated in the Financial tab.
+                Link this LOA to an awarded tender. EMD details will be auto-populated in the Financial tab.
               </FormDescription>
               <FormMessage />
             </FormItem>

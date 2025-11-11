@@ -13,12 +13,33 @@ interface ErrorResponse {
   stack?: string;
 }
 
+// Helper function to set CORS headers on error responses
+const setCorsHeaders = (res: Response, req: Request) => {
+  const allowedOrigins = [
+    'https://emprise.prossimatech.com',
+    'https://www.emprise.prossimatech.com',
+    'https://client.prossimatech.com',
+    'http://localhost:5173'
+  ];
+
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+};
+
 export const errorHandler = (
   error: Error,
   req: Request,
   res: Response,
-    next: NextFunction    
+    next: NextFunction
 ) => {
+  // Always set CORS headers on error responses
+  setCorsHeaders(res, req);
+
   console.error('Error:', {
     name: error.name,
     message: error.message,

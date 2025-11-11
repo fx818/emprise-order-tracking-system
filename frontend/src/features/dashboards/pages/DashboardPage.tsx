@@ -5,18 +5,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui
 import { Alert, AlertDescription } from "../../../components/ui/alert";
 import { LoadingSpinner } from '../../../components/feedback/LoadingSpinner';
 import { Button } from "../../../components/ui/button";
-import { 
-  FileText, 
-  ShoppingCart, 
-  AlertTriangle, 
-  Bell, 
-  Package, 
-  Clock, 
+import {
+  FileText,
+  ShoppingCart,
+  AlertTriangle,
+  Bell,
+  Package,
+  Clock,
   ArrowUpRight,
   AreaChart,
   Building,
   Tag,
-  FileCheck
+  FileCheck,
+  Calendar,
+  TrendingUp,
+  Timer
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -36,7 +39,7 @@ import { Progress } from "../../../components/ui/progress";
 // import '../dashboard.css';
 
 export function DashboardPage() {
-  const { loading, error, stats, activities, trends, offersByStatus } = useDashboardData();
+  const { loading, error, stats, activities, trends, offersByStatus, dispatchMetrics, processingMetrics } = useDashboardData();
   const [activeTab, setActiveTab] = useState("overview");
   const navigate = useNavigate();
 
@@ -98,6 +101,93 @@ export function DashboardPage() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Dispatch Due Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="stats-card">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Due in 7 Days</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl font-bold">{dispatchMetrics?.dueIn7Days ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-full bg-red-100">
+                    <Calendar className="h-5 w-5 text-red-600" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground">PO/LoA dispatch deadline</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="stats-card">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Due in 7-14 Days</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl font-bold">{dispatchMetrics?.dueIn7to14Days ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-full bg-amber-100">
+                    <Calendar className="h-5 w-5 text-amber-600" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground">PO/LoA dispatch deadline</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="stats-card">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Due in 14-30 Days</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl font-bold">{dispatchMetrics?.dueIn14to30Days ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-full bg-emerald-100">
+                    <Calendar className="h-5 w-5 text-emerald-600" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground">PO/LoA dispatch deadline</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="stats-card">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Processing Time</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl font-bold">{processingMetrics?.avgProcessingTime ?? 0}d</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        (processingMetrics?.avgDaysFromDue ?? 0) <= 0
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {(processingMetrics?.avgDaysFromDue ?? 0) > 0 ? '+' : ''}{processingMetrics?.avgDaysFromDue ?? 0}d
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-full bg-violet-100">
+                    <Timer className="h-5 w-5 text-violet-600" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Progress value={processingMetrics?.onTimePercentage ?? 0} className="h-1" />
+                  <p className="text-xs text-muted-foreground mt-2">{processingMetrics?.onTimePercentage ?? 0}% on-time or early</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Key stats row */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card className="stats-card">

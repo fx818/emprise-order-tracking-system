@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { CalendarIcon, Check, ChevronsUpDown, AlertCircle } from 'lucide-react';
+import { CalendarIcon, Check, ChevronsUpDown, AlertCircle, ExternalLink, FileText } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -53,6 +54,9 @@ export function TenderForm({
   const [emdMaturityDate, setEmdMaturityDate] = useState<Date | undefined>(undefined);
   const [emdBankName, setEmdBankName] = useState<string>('IDBI');
   const [sites, setSites] = useState<Site[]>([]);
+  const [existingDocumentUrl, setExistingDocumentUrl] = useState<string | undefined>(defaultValues?.documentUrl);
+  const [existingNitDocumentUrl, setExistingNitDocumentUrl] = useState<string | undefined>(defaultValues?.nitDocumentUrl);
+  const [existingEmdDocumentUrl, setExistingEmdDocumentUrl] = useState<string | undefined>(defaultValues?.emdDocumentUrl);
   const { getSites } = useSites();
 
   const form = useForm<TenderFormData>({
@@ -132,6 +136,28 @@ export function TenderForm({
     }
   }, [hasEMD, form]);
 
+  // Update existing document URLs when defaultValues changes
+  useEffect(() => {
+    if (defaultValues?.documentUrl) {
+      setExistingDocumentUrl(defaultValues.documentUrl);
+    }
+    if (defaultValues?.nitDocumentUrl) {
+      setExistingNitDocumentUrl(defaultValues.nitDocumentUrl);
+    }
+    if (defaultValues?.emdDocumentUrl) {
+      setExistingEmdDocumentUrl(defaultValues.emdDocumentUrl);
+    }
+    if (defaultValues?.emdSubmissionDate) {
+      setEmdSubmissionDate(defaultValues.emdSubmissionDate);
+    }
+    if (defaultValues?.emdMaturityDate) {
+      setEmdMaturityDate(defaultValues.emdMaturityDate);
+    }
+    if (defaultValues?.emdBankName) {
+      setEmdBankName(defaultValues.emdBankName);
+    }
+  }, [defaultValues]);
+
   const handleSubmit = async (data: TenderFormData) => {
     try {
       const tenderFormData = {
@@ -157,26 +183,53 @@ export function TenderForm({
           type: 'manual',
           message: errorMessage
         });
+        toast.error('Tender Number Error', {
+          description: errorMessage
+        });
       } else if (errorMessage.toLowerCase().includes('due date')) {
         form.setError('dueDate', {
           type: 'manual',
           message: errorMessage
+        });
+        toast.error('Due Date Error', {
+          description: errorMessage
         });
       } else if (errorMessage.toLowerCase().includes('emd')) {
         form.setError('emdAmount', {
           type: 'manual',
           message: errorMessage
         });
+        toast.error('EMD Error', {
+          description: errorMessage
+        });
       } else if (errorMessage.toLowerCase().includes('site')) {
         form.setError('siteId', {
           type: 'manual',
           message: errorMessage
+        });
+        toast.error('Site Error', {
+          description: errorMessage
+        });
+      } else if (errorMessage.toLowerCase().includes('description')) {
+        form.setError('description', {
+          type: 'manual',
+          message: errorMessage
+        });
+        toast.error('Description Error', {
+          description: errorMessage
+        });
+      } else if (errorMessage.toLowerCase().includes('document')) {
+        toast.error('Document Error', {
+          description: errorMessage
         });
       } else {
         // Generic error - set on root
         form.setError('root', {
           type: 'manual',
           message: errorMessage
+        });
+        toast.error('Error Saving Tender', {
+          description: errorMessage
         });
       }
     }
@@ -365,6 +418,7 @@ export function TenderForm({
                   onDataExtracted={handleEMDDataExtracted}
                   onFileChange={setEmdDocumentFile}
                   disabled={isSubmitting}
+                  existingDocumentUrl={existingEmdDocumentUrl}
                 />
 
                 {/* EMD Amount Field */}
@@ -450,7 +504,7 @@ export function TenderForm({
 
                 {/* Maturity Date Field */}
                 <FormItem className="flex flex-col">
-                  <FormLabel>EMD Maturity Date</FormLabel>
+                  <FormLabel>EMD Maturity Date (Optional)</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -486,7 +540,7 @@ export function TenderForm({
                     </PopoverContent>
                   </Popover>
                   <FormDescription>
-                    Date when the EMD will mature/expire
+                    Date when the EMD will mature/expire (optional)
                   </FormDescription>
                 </FormItem>
               </div>
@@ -515,23 +569,61 @@ export function TenderForm({
             
             <FormItem>
               <FormLabel>Tender Document</FormLabel>
+              {existingDocumentUrl && !file && (
+                <div className="mb-2 p-3 border rounded-md bg-muted/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Existing Document</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(existingDocumentUrl, '_blank')}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                  </div>
+                </div>
+              )}
               <FilePicker
                 accept=".pdf,.doc,.docx"
                 onChange={(file: File | null) => setFile(file)}
               />
               <FormDescription>
-                Upload a PDF or document file (max 5MB)
+                {existingDocumentUrl ? 'Upload a new file to replace the existing document' : 'Upload a PDF or document file (max 5MB)'}
               </FormDescription>
             </FormItem>
 
             <FormItem>
               <FormLabel>NIT Document</FormLabel>
+              {existingNitDocumentUrl && !nitFile && (
+                <div className="mb-2 p-3 border rounded-md bg-muted/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Existing NIT Document</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(existingNitDocumentUrl, '_blank')}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                  </div>
+                </div>
+              )}
               <FilePicker
                 accept=".pdf,.doc,.docx"
                 onChange={(file: File | null) => setNitFile(file)}
               />
               <FormDescription>
-                Upload NIT (Notice Inviting Tender) document (max 5MB)
+                {existingNitDocumentUrl ? 'Upload a new file to replace the existing NIT document' : 'Upload NIT (Notice Inviting Tender) document (max 5MB)'}
               </FormDescription>
             </FormItem>
           </CardContent>

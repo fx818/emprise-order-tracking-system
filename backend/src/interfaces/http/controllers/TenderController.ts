@@ -126,16 +126,16 @@ export class TenderController {
     }
   };
 
-  updateEMDReturnStatus = async (req: Request, res: Response) => {
+  updateEMDReleaseStatus = async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { emdReturnStatus, emdReturnDate, emdReturnAmount } = req.body;
+      const { emdReleaseStatus, emdReleaseDate, emdReleaseAmount } = req.body;
 
-      const updatedTender = await this.service.updateEMDReturnStatus(
+      const updatedTender = await this.service.updateEMDReleaseStatus(
         id,
-        emdReturnStatus,
-        emdReturnDate ? new Date(emdReturnDate) : undefined,
-        emdReturnAmount ? parseFloat(emdReturnAmount) : undefined
+        emdReleaseStatus,
+        emdReleaseDate ? new Date(emdReleaseDate) : undefined,
+        emdReleaseAmount ? parseFloat(emdReleaseAmount) : undefined
       );
 
       res.json({
@@ -146,7 +146,7 @@ export class TenderController {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Failed to update EMD return status');
+      throw new AppError('Failed to update EMD release status');
     }
   };
 } 

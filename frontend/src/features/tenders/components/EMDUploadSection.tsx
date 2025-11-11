@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, FileText, Loader2, Check, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Loader2, Check, AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
@@ -16,9 +16,10 @@ interface EMDUploadSectionProps {
   }) => void;
   onFileChange?: (file: File | null) => void;
   disabled?: boolean;
+  existingDocumentUrl?: string;
 }
 
-export function EMDUploadSection({ onDataExtracted, onFileChange, disabled }: EMDUploadSectionProps) {
+export function EMDUploadSection({ onDataExtracted, onFileChange, disabled, existingDocumentUrl }: EMDUploadSectionProps) {
   const [file, setFile] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState(false);
@@ -75,6 +76,25 @@ export function EMDUploadSection({ onDataExtracted, onFileChange, disabled }: EM
       <CardContent className="pt-6 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="emd-document">Upload EMD/FDR Document (Optional)</Label>
+          {existingDocumentUrl && !file && (
+            <div className="mb-2 p-3 border rounded-md bg-muted/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Existing EMD Document</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(existingDocumentUrl, '_blank')}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  View
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2">
             <Input
               id="emd-document"
@@ -106,7 +126,7 @@ export function EMDUploadSection({ onDataExtracted, onFileChange, disabled }: EM
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            Upload an FDR/EMD document image or PDF. AI will extract the amount, dates, and bank name automatically.
+            {existingDocumentUrl ? 'Upload a new file to replace the existing EMD document. AI will extract the amount, dates, and bank name automatically.' : 'Upload an FDR/EMD document image or PDF. AI will extract the amount, dates, and bank name automatically.'}
           </p>
         </div>
 

@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { Toaster } from './components/ui/toaster';
+import { Toaster as Sonner } from 'sonner';
 import { ProtectedRoute } from './routes/protected';
 import { ThemeProvider } from './context/ThemeProvider';
 import { AuthProvider } from './context/AuthProvider';
@@ -79,6 +80,7 @@ function App() {
               </Routes>
             </Suspense>
             <Toaster />
+            <Sonner />
           </AuthProvider>
         </ThemeProvider>
       </Router>

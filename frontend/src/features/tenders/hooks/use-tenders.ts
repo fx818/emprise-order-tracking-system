@@ -193,24 +193,24 @@ export function useTenders() {
     }
   }, [showSuccess, showError]);
 
-  // PATCH /tenders/{id}/emd-return-status - Update EMD return status
-  const updateEMDReturnStatus = useCallback(async (
+  // PATCH /tenders/{id}/emd-release-status - Update EMD release status
+  const updateEMDReleaseStatus = useCallback(async (
     id: string,
-    emdReturnStatus: string,
-    emdReturnDate?: Date,
-    emdReturnAmount?: number
+    emdReleaseStatus: string,
+    emdReleaseDate?: Date,
+    emdReleaseAmount?: number
   ) => {
     try {
       setLoading(true);
-      const response = await apiClient.patch<SingleTenderResponse>(`/tenders/${id}/emd-return-status`, {
-        emdReturnStatus,
-        emdReturnDate: emdReturnDate?.toISOString(),
-        emdReturnAmount
+      const response = await apiClient.patch<SingleTenderResponse>(`/tenders/${id}/emd-release-status`, {
+        emdReleaseStatus,
+        emdReleaseDate: emdReleaseDate?.toISOString(),
+        emdReleaseAmount
       });
-      showSuccess('EMD return status updated successfully');
+      showSuccess('EMD release status updated successfully');
       return response.data.data;
     } catch (error: any) {
-      showError(error.response?.data?.message || 'Failed to update EMD return status');
+      showError(error.response?.data?.message || 'Failed to update EMD release status');
       throw error;
     } finally {
       setLoading(false);
@@ -225,6 +225,6 @@ export function useTenders() {
     updateTender,
     deleteTender,
     updateTenderStatus,
-    updateEMDReturnStatus
+    updateEMDReleaseStatus
   };
 } 

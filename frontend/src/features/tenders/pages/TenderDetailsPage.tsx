@@ -48,13 +48,13 @@ export function TenderDetailsPage() {
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<TenderStatus | ''>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [isEMDReturnDialogOpen, setIsEMDReturnDialogOpen] = useState(false);
-  const [selectedEMDReturnStatus, setSelectedEMDReturnStatus] = useState<EMDReturnStatus | ''>('');
-  const [emdReturnDate, setEmdReturnDate] = useState<string>('');
-  const [emdReturnAmount, setEmdReturnAmount] = useState<string>('');
+  const [isEMDReleaseDialogOpen, setIsEMDReleaseDialogOpen] = useState(false);
+  const [selectedEMDReleaseStatus, setSelectedEMDReleaseStatus] = useState<EMDReturnStatus | ''>('');
+  const [emdReleaseDate, setEmdReleaseDate] = useState<string>('');
+  const [emdReleaseAmount, setEmdReleaseAmount] = useState<string>('');
   const [isUpdatingEMDStatus, setIsUpdatingEMDStatus] = useState(false);
   const navigate = useNavigate();
-  const { getTenderById, updateTenderStatus, updateEMDReturnStatus } = useTenders();
+  const { getTenderById, updateTenderStatus, updateEMDReleaseStatus } = useTenders();
   const { getLoasByTender } = useLOAs();
 
   useEffect(() => {
@@ -190,36 +190,36 @@ export function TenderDetailsPage() {
     }
   };
 
-  const handleEMDReturnStatusUpdate = async () => {
-    if (!id || !tender || !selectedEMDReturnStatus) {
-      setIsEMDReturnDialogOpen(false);
+  const handleEMDReleaseStatusUpdate = async () => {
+    if (!id || !tender || !selectedEMDReleaseStatus) {
+      setIsEMDReleaseDialogOpen(false);
       return;
     }
 
     try {
       setIsUpdatingEMDStatus(true);
-      const updatedTender = await updateEMDReturnStatus(
+      const updatedTender = await updateEMDReleaseStatus(
         id,
-        selectedEMDReturnStatus,
-        emdReturnDate ? new Date(emdReturnDate) : undefined,
-        emdReturnAmount ? parseFloat(emdReturnAmount) : undefined
+        selectedEMDReleaseStatus,
+        emdReleaseDate ? new Date(emdReleaseDate) : undefined,
+        emdReleaseAmount ? parseFloat(emdReleaseAmount) : undefined
       );
       setTender(updatedTender);
-      setIsEMDReturnDialogOpen(false);
-      setEmdReturnDate('');
-      setEmdReturnAmount('');
+      setIsEMDReleaseDialogOpen(false);
+      setEmdReleaseDate('');
+      setEmdReleaseAmount('');
     } catch (error) {
-      console.error('Failed to update EMD return status', error);
+      console.error('Failed to update EMD release status', error);
     } finally {
       setIsUpdatingEMDStatus(false);
     }
   };
 
-  const openEMDReturnDialog = () => {
-    setSelectedEMDReturnStatus(tender?.emdReturnStatus || 'PENDING');
-    setEmdReturnDate(tender?.emdReturnDate ? format(new Date(tender.emdReturnDate), 'yyyy-MM-dd') : '');
-    setEmdReturnAmount(tender?.emdReturnAmount?.toString() || '');
-    setIsEMDReturnDialogOpen(true);
+  const openEMDReleaseDialog = () => {
+    setSelectedEMDReleaseStatus(tender?.emdReleaseStatus || 'PENDING');
+    setEmdReleaseDate(tender?.emdReleaseDate ? format(new Date(tender.emdReleaseDate), 'yyyy-MM-dd') : '');
+    setEmdReleaseAmount(tender?.emdReleaseAmount?.toString() || '');
+    setIsEMDReleaseDialogOpen(true);
   };
 
   if (loading) {
@@ -413,17 +413,15 @@ export function TenderDetailsPage() {
               <div className="flex items-center justify-between">
                 <CardTitle>EMD Details & Tracking</CardTitle>
                 <div className="flex items-center gap-2">
-                  {getEMDReturnStatusBadge(tender.emdReturnStatus)}
-                  {tender.status === 'NOT_AWARDED' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={openEMDReturnDialog}
-                    >
-                      <RefreshCcw className="h-4 w-4 mr-2" />
-                      Update EMD Status
-                    </Button>
-                  )}
+                  {getEMDReturnStatusBadge(tender.emdReleaseStatus)}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={openEMDReleaseDialog}
+                  >
+                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    Update EMD Status
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -501,27 +499,27 @@ export function TenderDetailsPage() {
                 )}
               </div>
 
-              {/* EMD Return Details - Only show for NOT_AWARDED */}
-              {tender.status === 'NOT_AWARDED' && tender.emdReturnStatus && tender.emdReturnStatus !== 'PENDING' && (
+              {/* EMD Release Details */}
+              {tender.emdReleaseStatus && tender.emdReleaseStatus !== 'PENDING' && (
                 <>
                   <Separator className="my-6" />
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold">EMD Return Information</h3>
+                    <h3 className="text-sm font-semibold">EMD Release Information</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <h4 className="text-sm font-medium text-muted-foreground">Return Status</h4>
-                        <div>{getEMDReturnStatusBadge(tender.emdReturnStatus)}</div>
+                        <h4 className="text-sm font-medium text-muted-foreground">Release Status</h4>
+                        <div>{getEMDReturnStatusBadge(tender.emdReleaseStatus)}</div>
                       </div>
-                      {tender.emdReturnDate && (
+                      {tender.emdReleaseDate && (
                         <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Return Date</h4>
-                          <p className="font-medium">{format(new Date(tender.emdReturnDate), 'PPP')}</p>
+                          <h4 className="text-sm font-medium text-muted-foreground">Release Date</h4>
+                          <p className="font-medium">{format(new Date(tender.emdReleaseDate), 'PPP')}</p>
                         </div>
                       )}
-                      {tender.emdReturnAmount && (
+                      {tender.emdReleaseAmount && (
                         <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Amount Returned</h4>
-                          <p className="font-medium">₹{tender.emdReturnAmount.toLocaleString('en-IN')}</p>
+                          <h4 className="text-sm font-medium text-muted-foreground">Amount Released</h4>
+                          <p className="font-medium">₹{tender.emdReleaseAmount.toLocaleString('en-IN')}</p>
                         </div>
                       )}
                     </div>
@@ -589,13 +587,13 @@ export function TenderDetailsPage() {
         </Card>
       </div>
 
-      {/* EMD Return Status Update Dialog */}
-      <Dialog open={isEMDReturnDialogOpen} onOpenChange={setIsEMDReturnDialogOpen}>
+      {/* EMD Release Status Update Dialog */}
+      <Dialog open={isEMDReleaseDialogOpen} onOpenChange={setIsEMDReleaseDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update EMD Return Status</DialogTitle>
+            <DialogTitle>Update EMD Release Status</DialogTitle>
             <DialogDescription>
-              Update the EMD return status for tender {tender.tenderNumber}.
+              Update the EMD release status for tender {tender.tenderNumber}.
             </DialogDescription>
           </DialogHeader>
 
@@ -605,8 +603,8 @@ export function TenderDetailsPage() {
                 Status
               </Label>
               <Select
-                value={selectedEMDReturnStatus}
-                onValueChange={(value) => setSelectedEMDReturnStatus(value as EMDReturnStatus)}
+                value={selectedEMDReleaseStatus}
+                onValueChange={(value) => setSelectedEMDReleaseStatus(value as EMDReturnStatus)}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select EMD status" />
@@ -620,38 +618,38 @@ export function TenderDetailsPage() {
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="return-date" className="text-right">
-                Return Date
+              <Label htmlFor="release-date" className="text-right">
+                Release Date
               </Label>
               <Input
-                id="return-date"
+                id="release-date"
                 type="date"
-                value={emdReturnDate}
-                onChange={(e) => setEmdReturnDate(e.target.value)}
+                value={emdReleaseDate}
+                onChange={(e) => setEmdReleaseDate(e.target.value)}
                 className="col-span-3"
               />
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="return-amount" className="text-right">
-                Amount Returned
+              <Label htmlFor="release-amount" className="text-right">
+                Amount Released
               </Label>
               <Input
-                id="return-amount"
+                id="release-amount"
                 type="number"
                 placeholder="Enter amount"
-                value={emdReturnAmount}
-                onChange={(e) => setEmdReturnAmount(e.target.value)}
+                value={emdReleaseAmount}
+                onChange={(e) => setEmdReleaseAmount(e.target.value)}
                 className="col-span-3"
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEMDReturnDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsEMDReleaseDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleEMDReturnStatusUpdate} disabled={isUpdatingEMDStatus || !selectedEMDReturnStatus}>
+            <Button onClick={handleEMDReleaseStatusUpdate} disabled={isUpdatingEMDStatus || !selectedEMDReleaseStatus}>
               {isUpdatingEMDStatus ? 'Updating...' : 'Update EMD Status'}
             </Button>
           </DialogFooter>

@@ -34,7 +34,14 @@ export function EditTenderPage() {
             description: tender.description,
             hasEMD: tender.hasEMD,
             emdAmount: tender.emdAmount !== undefined ? tender.emdAmount : null,
+            emdBankName: tender.emdBankName || undefined,
+            emdSubmissionDate: tender.emdSubmissionDate ? new Date(tender.emdSubmissionDate) : undefined,
+            emdMaturityDate: tender.emdMaturityDate ? new Date(tender.emdMaturityDate) : undefined,
             tags: tender.tags || [],
+            siteId: tender.siteId || undefined,
+            documentUrl: tender.documentUrl,
+            nitDocumentUrl: tender.nitDocumentUrl || undefined,
+            emdDocumentUrl: tender.emdDocumentUrl || undefined,
           });
         }
       } catch (error) {

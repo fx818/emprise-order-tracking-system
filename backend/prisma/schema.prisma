@@ -271,28 +271,28 @@ model Customer {
 }
 
 model Tender {
-  id                String           @id @default(uuid())
-  tenderNumber      String           @unique
-  dueDate           DateTime
-  description       String
-  hasEMD            Boolean          @default(false)
-  emdAmount         Float?
-  emdBankName       String?
-  emdSubmissionDate DateTime?
-  emdMaturityDate   DateTime?
-  emdDocumentUrl    String?
-  emdReturnStatus   EMDReturnStatus?
-  emdReturnDate     DateTime?
-  emdReturnAmount   Float?
-  documentUrl       String?
-  tags              String[]
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  nitDocumentUrl    String?
-  status            TenderStatus     @default(ACTIVE)
-  siteId            String?
-  loas              LOA[]
-  site              Site?            @relation(fields: [siteId], references: [id])
+  id                 String           @id @default(uuid())
+  tenderNumber       String           @unique
+  dueDate            DateTime
+  description        String
+  hasEMD             Boolean          @default(false)
+  emdAmount          Float?
+  emdBankName        String?
+  emdSubmissionDate  DateTime?
+  emdMaturityDate    DateTime?
+  emdDocumentUrl     String?
+  emdReleaseStatus   EMDReturnStatus?
+  emdReleaseDate     DateTime?
+  emdReleaseAmount   Float?
+  documentUrl        String?
+  tags               String[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  nitDocumentUrl     String?
+  status             TenderStatus     @default(ACTIVE)
+  siteId             String?
+  loas               LOA[]
+  site               Site?            @relation(fields: [siteId], references: [id])
 
   @@index([siteId])
 }

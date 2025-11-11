@@ -146,7 +146,7 @@ export function TenderList() {
     },
     {
       header: "EMD Status",
-      accessor: (row) => row.hasEMD ? getEMDReturnStatusBadge(row.emdReturnStatus) : '-',
+      accessor: (row) => row.hasEMD ? getEMDReturnStatusBadge(row.emdReleaseStatus) : '-',
     },
     {
       header: "Actions",

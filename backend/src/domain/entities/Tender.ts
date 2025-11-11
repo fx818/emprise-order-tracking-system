@@ -11,9 +11,9 @@ export interface Tender {
   emdSubmissionDate?: Date;
   emdMaturityDate?: Date;
   emdDocumentUrl?: string;
-  emdReturnStatus?: EMDReturnStatus;
-  emdReturnDate?: Date;
-  emdReturnAmount?: number;
+  emdReleaseStatus?: EMDReturnStatus;
+  emdReleaseDate?: Date;
+  emdReleaseAmount?: number;
   status: TenderStatus;
   documentUrl?: string;
   nitDocumentUrl?: string;

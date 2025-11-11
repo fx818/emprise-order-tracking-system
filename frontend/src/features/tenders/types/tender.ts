@@ -13,7 +13,10 @@ export const tenderSchema = z.object({
   documentFile: z.any().optional(),
   nitDocumentFile: z.any().optional(),
   emdDocumentFile: z.any().optional(),
-  siteId: z.string().optional()
+  siteId: z.string().optional(),
+  documentUrl: z.string().optional(),
+  nitDocumentUrl: z.string().optional(),
+  emdDocumentUrl: z.string().optional()
 });
 
 export type TenderFormData = z.infer<typeof tenderSchema>;
@@ -33,9 +36,9 @@ export interface Tender {
   emdSubmissionDate?: string | null;
   emdMaturityDate?: string | null;
   emdDocumentUrl?: string | null;
-  emdReturnStatus?: EMDReturnStatus | null;
-  emdReturnDate?: string | null;
-  emdReturnAmount?: number | null;
+  emdReleaseStatus?: EMDReturnStatus | null;
+  emdReleaseDate?: string | null;
+  emdReleaseAmount?: number | null;
   status: TenderStatus;
   documentUrl?: string;
   nitDocumentUrl?: string;

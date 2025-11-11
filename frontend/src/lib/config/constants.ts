@@ -1,5 +1,5 @@
-// export const API_BASE_URL = 'http://localhost:3000/api';
-export const API_BASE_URL = 'https://client.prossimatech.com/api';
+export const API_BASE_URL = 'http://localhost:3000/api';
+// export const API_BASE_URL = 'https://client.prossimatech.com/api';
 
 export const TOKEN_KEY = 'auth_token';
 export const USER_KEY = 'user_data';

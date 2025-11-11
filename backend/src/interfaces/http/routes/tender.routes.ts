@@ -218,9 +218,9 @@ export function tenderRoutes(controller: TenderController) {
     controller.updateStatus
   );
 
-  router.patch('/:id/emd-return-status',
+  router.patch('/:id/emd-release-status',
     authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
-    controller.updateEMDReturnStatus
+    controller.updateEMDReleaseStatus
   );
 
   return router;

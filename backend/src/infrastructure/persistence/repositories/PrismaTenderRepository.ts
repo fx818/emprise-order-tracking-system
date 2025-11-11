@@ -16,9 +16,9 @@ export class PrismaTenderRepository {
       emdSubmissionDate: prismaTender.emdSubmissionDate,
       emdMaturityDate: prismaTender.emdMaturityDate,
       emdDocumentUrl: prismaTender.emdDocumentUrl,
-      emdReturnStatus: prismaTender.emdReturnStatus,
-      emdReturnDate: prismaTender.emdReturnDate,
-      emdReturnAmount: prismaTender.emdReturnAmount,
+      emdReleaseStatus: prismaTender.emdReleaseStatus,
+      emdReleaseDate: prismaTender.emdReleaseDate,
+      emdReleaseAmount: prismaTender.emdReleaseAmount,
       status: prismaTender.status,
       documentUrl: prismaTender.documentUrl,
       nitDocumentUrl: prismaTender.nitDocumentUrl,
@@ -61,7 +61,7 @@ export class PrismaTenderRepository {
         emdSubmissionDate: tender.emdSubmissionDate || null,
         emdMaturityDate: tender.emdMaturityDate || null,
         emdDocumentUrl: tender.emdDocumentUrl || null,
-        emdReturnStatus: tender.emdReturnStatus || null,
+        emdReleaseStatus: tender.emdReleaseStatus || null,
         status: tender.status,
         documentUrl: tender.documentUrl,
         nitDocumentUrl: tender.nitDocumentUrl || null,
@@ -104,9 +104,9 @@ export class PrismaTenderRepository {
     if (tender.emdSubmissionDate !== undefined) updateData.emdSubmissionDate = tender.emdSubmissionDate;
     if (tender.emdMaturityDate !== undefined) updateData.emdMaturityDate = tender.emdMaturityDate;
     if (tender.emdDocumentUrl !== undefined) updateData.emdDocumentUrl = tender.emdDocumentUrl;
-    if (tender.emdReturnStatus !== undefined) updateData.emdReturnStatus = tender.emdReturnStatus;
-    if (tender.emdReturnDate !== undefined) updateData.emdReturnDate = tender.emdReturnDate;
-    if (tender.emdReturnAmount !== undefined) updateData.emdReturnAmount = tender.emdReturnAmount;
+    if (tender.emdReleaseStatus !== undefined) updateData.emdReleaseStatus = tender.emdReleaseStatus;
+    if (tender.emdReleaseDate !== undefined) updateData.emdReleaseDate = tender.emdReleaseDate;
+    if (tender.emdReleaseAmount !== undefined) updateData.emdReleaseAmount = tender.emdReleaseAmount;
     if (tender.status !== undefined) updateData.status = tender.status;
     if (tender.documentUrl !== undefined) updateData.documentUrl = tender.documentUrl;
     if (tender.nitDocumentUrl !== undefined) updateData.nitDocumentUrl = tender.nitDocumentUrl;

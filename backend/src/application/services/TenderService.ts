@@ -127,7 +127,7 @@ export class TenderService {
           emdSubmissionDate: dto.emdSubmissionDate ? (typeof dto.emdSubmissionDate === 'string' ? new Date(dto.emdSubmissionDate) : dto.emdSubmissionDate) : undefined,
           emdMaturityDate: dto.emdMaturityDate ? (typeof dto.emdMaturityDate === 'string' ? new Date(dto.emdMaturityDate) : dto.emdMaturityDate) : undefined,
           emdDocumentUrl,
-          emdReturnStatus: hasEMD ? EMDReturnStatus.PENDING : undefined,
+          emdReleaseStatus: hasEMD ? EMDReturnStatus.PENDING : undefined,
           status: dto.status || TenderStatus.ACTIVE,
           documentUrl,
           nitDocumentUrl,
@@ -257,12 +257,12 @@ export class TenderService {
         }
       }
 
-      // Convert emdReturnAmount if provided
-      let emdReturnAmount: number | undefined = undefined;
-      if (dto.emdReturnAmount !== undefined && dto.emdReturnAmount !== null) {
-        emdReturnAmount = typeof dto.emdReturnAmount === 'string'
-          ? parseFloat(dto.emdReturnAmount)
-          : dto.emdReturnAmount;
+      // Convert emdReleaseAmount if provided
+      let emdReleaseAmount: number | undefined = undefined;
+      if (dto.emdReleaseAmount !== undefined && dto.emdReleaseAmount !== null) {
+        emdReleaseAmount = typeof dto.emdReleaseAmount === 'string'
+          ? parseFloat(dto.emdReleaseAmount)
+          : dto.emdReleaseAmount;
       }
 
       const updatedTender = await this.repository.update(id, {
@@ -275,9 +275,9 @@ export class TenderService {
         emdSubmissionDate: dto.emdSubmissionDate ? (typeof dto.emdSubmissionDate === 'string' ? new Date(dto.emdSubmissionDate) : dto.emdSubmissionDate) : undefined,
         emdMaturityDate: dto.emdMaturityDate ? (typeof dto.emdMaturityDate === 'string' ? new Date(dto.emdMaturityDate) : dto.emdMaturityDate) : undefined,
         emdDocumentUrl,
-        emdReturnStatus: dto.emdReturnStatus,
-        emdReturnDate: dto.emdReturnDate ? (typeof dto.emdReturnDate === 'string' ? new Date(dto.emdReturnDate) : dto.emdReturnDate) : undefined,
-        emdReturnAmount,
+        emdReleaseStatus: dto.emdReleaseStatus,
+        emdReleaseDate: dto.emdReleaseDate ? (typeof dto.emdReleaseDate === 'string' ? new Date(dto.emdReleaseDate) : dto.emdReleaseDate) : undefined,
+        emdReleaseAmount,
         status: dto.status,
         documentUrl,
         nitDocumentUrl,
@@ -384,11 +384,11 @@ export class TenderService {
     }
   }
 
-  async updateEMDReturnStatus(
+  async updateEMDReleaseStatus(
     id: string,
-    emdReturnStatus: EMDReturnStatus,
-    emdReturnDate?: Date,
-    emdReturnAmount?: number
+    emdReleaseStatus: EMDReturnStatus,
+    emdReleaseDate?: Date,
+    emdReleaseAmount?: number
   ): Promise<TenderResponseDto> {
     try {
       const tender = await this.repository.findById(id);
@@ -401,18 +401,18 @@ export class TenderService {
       }
 
       const updatedTender = await this.repository.update(id, {
-        emdReturnStatus,
-        emdReturnDate,
-        emdReturnAmount
+        emdReleaseStatus,
+        emdReleaseDate,
+        emdReleaseAmount
       });
 
       return this.mapToResponseDto(updatedTender);
     } catch (error) {
-      console.error('Error in updateEMDReturnStatus:', error);
+      console.error('Error in updateEMDReleaseStatus:', error);
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Failed to update EMD return status', 500);
+      throw new AppError('Failed to update EMD release status', 500);
     }
   }
 
@@ -445,9 +445,9 @@ export class TenderService {
       emdSubmissionDate: tender.emdSubmissionDate,
       emdMaturityDate: tender.emdMaturityDate,
       emdDocumentUrl: tender.emdDocumentUrl,
-      emdReturnStatus: tender.emdReturnStatus,
-      emdReturnDate: tender.emdReturnDate,
-      emdReturnAmount: tender.emdReturnAmount,
+      emdReleaseStatus: tender.emdReleaseStatus,
+      emdReleaseDate: tender.emdReleaseDate,
+      emdReleaseAmount: tender.emdReleaseAmount,
       status: tender.status,
       documentUrl: tender.documentUrl,
       nitDocumentUrl: tender.nitDocumentUrl,

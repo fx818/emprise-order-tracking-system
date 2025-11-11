@@ -10,9 +10,9 @@ export interface UpdateTenderDto {
   emdSubmissionDate?: Date | string;
   emdMaturityDate?: Date | string;
   emdDocumentFile?: Express.Multer.File;
-  emdReturnStatus?: EMDReturnStatus;
-  emdReturnDate?: Date | string;
-  emdReturnAmount?: number | string;
+  emdReleaseStatus?: EMDReturnStatus;
+  emdReleaseDate?: Date | string;
+  emdReleaseAmount?: number | string;
   status?: TenderStatus;
   documentFile?: Express.Multer.File;
   nitDocumentFile?: Express.Multer.File;

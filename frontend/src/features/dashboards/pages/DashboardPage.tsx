@@ -18,7 +18,6 @@ import {
   Tag,
   FileCheck,
   Calendar,
-  TrendingUp,
   Timer
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';

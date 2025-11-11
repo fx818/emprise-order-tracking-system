@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { startOfMonth, endOfMonth, subMonths, addDays, differenceInDays } from 'date-fns';
 
 export class DashboardService {
   constructor(private prisma: PrismaClient) {}
@@ -248,24 +248,143 @@ export class DashboardService {
     const allStatuses = Object.values(await this.prisma.$queryRaw<{status: string}[]>`
       SELECT unnest(enum_range(NULL::"OfferStatus")) as status
     `).map(s => s.status);
-    
+
     // Get counts for each status
     const statusCounts = await this.prisma.budgetaryOffer.groupBy({
       by: ['status'],
       _count: true
     });
-    
+
     // Create a map of status to count
     const countMap = statusCounts.reduce((acc, curr) => {
       acc[curr.status] = curr._count;
       return acc;
     }, {} as Record<string, number>);
-    
+
     // Map all statuses including those with zero count
     return allStatuses.map(status => ({
       name: status,
       value: countMap[status] || 0,
       color: this.getStatusColor(status)
     }));
+  }
+
+  async getDispatchDueMetrics() {
+    const currentDate = new Date();
+    const next7Days = addDays(currentDate, 7);
+    const next14Days = addDays(currentDate, 14);
+    const next30Days = addDays(currentDate, 30);
+
+    // Get LOAs whose dispatch is due in next 7 days, 7-14 days, and 14-30 days
+    const [dueIn7Days, dueIn7to14Days, dueIn14to30Days] = await Promise.all([
+      // Due in next 7 days
+      this.prisma.lOA.count({
+        where: {
+          dueDate: {
+            gte: currentDate,
+            lte: next7Days
+          },
+          status: {
+            not: 'CLOSED'
+          }
+        }
+      }),
+      // Due in 7-14 days
+      this.prisma.lOA.count({
+        where: {
+          dueDate: {
+            gt: next7Days,
+            lte: next14Days
+          },
+          status: {
+            not: 'CLOSED'
+          }
+        }
+      }),
+      // Due in 14-30 days
+      this.prisma.lOA.count({
+        where: {
+          dueDate: {
+            gt: next14Days,
+            lte: next30Days
+          },
+          status: {
+            not: 'CLOSED'
+          }
+        }
+      })
+    ]);
+
+    return {
+      dueIn7Days,
+      dueIn7to14Days,
+      dueIn14to30Days
+    };
+  }
+
+  async getProcessingTimeMetrics() {
+    // Get average processing time for LOAs (from createdAt to orderReceivedDate for CLOSED status)
+    const loaProcessingTime = await this.prisma.lOA.findMany({
+      where: {
+        status: 'CLOSED',
+        orderReceivedDate: {
+          not: null
+        }
+      },
+      select: {
+        createdAt: true,
+        orderReceivedDate: true,
+        dueDate: true
+      }
+    });
+
+    // Calculate average processing time and comparison to due date
+    let totalProcessingDays = 0;
+    let totalDaysAheadBehind = 0;
+    let onTimeCount = 0;
+    let lateCount = 0;
+    let earlyCount = 0;
+    let processedCount = 0;
+
+    loaProcessingTime.forEach(loa => {
+      if (loa.orderReceivedDate) {
+        // Processing time: from creation to closure
+        const processingDays = differenceInDays(loa.orderReceivedDate, loa.createdAt);
+        totalProcessingDays += processingDays;
+
+        // Compare to due date if available
+        if (loa.dueDate) {
+          const daysFromDue = differenceInDays(loa.orderReceivedDate, loa.dueDate);
+          totalDaysAheadBehind += daysFromDue;
+
+          if (daysFromDue < 0) {
+            earlyCount++; // Closed before due date (negative = early)
+          } else if (daysFromDue === 0) {
+            onTimeCount++; // Closed on due date
+          } else {
+            lateCount++; // Closed after due date
+          }
+        }
+
+        processedCount++;
+      }
+    });
+
+    const avgProcessingTime = processedCount > 0 ? totalProcessingDays / processedCount : 0;
+    const avgDaysFromDue = processedCount > 0 ? totalDaysAheadBehind / processedCount : 0;
+
+    // Calculate percentage metrics
+    const totalWithDueDate = earlyCount + onTimeCount + lateCount;
+    const onTimePercentage = totalWithDueDate > 0 ? ((earlyCount + onTimeCount) / totalWithDueDate) * 100 : 0;
+
+    return {
+      avgProcessingTime: Math.round(avgProcessingTime * 10) / 10, // Round to 1 decimal
+      avgDaysFromDue: Math.round(avgDaysFromDue * 10) / 10, // Positive = late, Negative = early
+      onTimePercentage: Math.round(onTimePercentage),
+      earlyCount,
+      onTimeCount,
+      lateCount,
+      totalProcessed: processedCount
+    };
   }
 }

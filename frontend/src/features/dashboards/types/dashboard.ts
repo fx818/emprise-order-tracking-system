@@ -48,3 +48,19 @@ export interface StatisticCard {
     processingTimeTrend: number;
     offerStatus: Array<{ name: string; value: number; color: string }>;
   }
+
+  export interface DispatchDueMetrics {
+    dueIn7Days: number;
+    dueIn7to14Days: number;
+    dueIn14to30Days: number;
+  }
+
+  export interface ProcessingTimeMetrics {
+    avgProcessingTime: number;
+    avgDaysFromDue: number;
+    onTimePercentage: number;
+    earlyCount: number;
+    onTimeCount: number;
+    lateCount: number;
+    totalProcessed: number;
+  }

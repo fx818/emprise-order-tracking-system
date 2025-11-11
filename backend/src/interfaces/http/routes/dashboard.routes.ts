@@ -32,5 +32,17 @@ export function setupDashboardRoutes(
     dashboardController.getOffersByStatus
   );
 
+  router.get(
+    '/dispatch-due-metrics',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
+    dashboardController.getDispatchDueMetrics
+  );
+
+  router.get(
+    '/processing-time-metrics',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
+    dashboardController.getProcessingTimeMetrics
+  );
+
   return router;
 }

@@ -208,6 +208,11 @@ export function tenderRoutes(controller: TenderController) {
     controller.getAllTenders
   );
 
+  // Explicitly handle OPTIONS preflight for status update
+  router.options('/:id/status', (req, res) => {
+    res.status(200).end();
+  });
+
   router.patch('/:id/status',
     authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
     controller.updateStatus

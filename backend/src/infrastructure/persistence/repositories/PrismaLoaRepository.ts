@@ -102,6 +102,11 @@ export class PrismaLoaRepository {
         status: prismaLoa.pgFdr.status,
         category: prismaLoa.pgFdr.category
       } : undefined,
+      recoverablePending: prismaLoa.recoverablePending,
+      paymentPending: prismaLoa.paymentPending,
+      manualTotalBilled: prismaLoa.manualTotalBilled || undefined,
+      manualTotalReceived: prismaLoa.manualTotalReceived || undefined,
+      manualTotalDeducted: prismaLoa.manualTotalDeducted || undefined,
       createdAt: prismaLoa.createdAt,
       updatedAt: prismaLoa.updatedAt
     };
@@ -152,10 +157,11 @@ export class PrismaLoaRepository {
     warrantyEndDate?: Date;
     dueDate?: Date;
     orderReceivedDate?: Date;
-    actualAmountReceived?: number;
-    amountDeducted?: number;
-    amountPending?: number;
-    deductionReason?: string;
+    recoverablePending?: number;
+    paymentPending?: number;
+    manualTotalBilled?: number;
+    manualTotalReceived?: number;
+    manualTotalDeducted?: number;
   }): Promise<LOA> {
     try {
       const prismaLoa = await this.prisma.lOA.create({
@@ -183,10 +189,11 @@ export class PrismaLoaRepository {
           sdFdrId: data.sdFdrId || null,
           hasPg: data.hasPg || false,
           pgFdrId: data.pgFdrId || null,
-          actualAmountReceived: data.actualAmountReceived || null,
-          amountDeducted: data.amountDeducted || null,
-          amountPending: data.amountPending || null,
-          deductionReason: data.deductionReason || null
+          recoverablePending: data.recoverablePending || 0,
+          paymentPending: data.paymentPending || 0,
+          manualTotalBilled: data.manualTotalBilled || null,
+          manualTotalReceived: data.manualTotalReceived || null,
+          manualTotalDeducted: data.manualTotalDeducted || null
         },
         include: {
           amendments: true,
@@ -252,6 +259,15 @@ export class PrismaLoaRepository {
       updateData.inspectionAgency = data.inspectionAgencyId ? { connect: { id: data.inspectionAgencyId } } : { disconnect: true };
     }
     if (data.fdBgDetails !== undefined) updateData.fdBgDetails = data.fdBgDetails;
+
+    // Handle pending split fields
+    if (data.recoverablePending !== undefined) updateData.recoverablePending = data.recoverablePending;
+    if (data.paymentPending !== undefined) updateData.paymentPending = data.paymentPending;
+
+    // Handle manual override fields
+    if (data.manualTotalBilled !== undefined) updateData.manualTotalBilled = data.manualTotalBilled;
+    if (data.manualTotalReceived !== undefined) updateData.manualTotalReceived = data.manualTotalReceived;
+    if (data.manualTotalDeducted !== undefined) updateData.manualTotalDeducted = data.manualTotalDeducted;
 
     try {
       const prismaLoa = await this.prisma.lOA.update({

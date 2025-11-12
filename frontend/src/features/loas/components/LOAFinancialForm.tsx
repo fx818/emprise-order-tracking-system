@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Save, X, Calculator } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Save, X, Info, Trash2, Edit3 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface LOAFinancialFormProps {
@@ -19,17 +20,23 @@ interface LOAFinancialFormProps {
   onOpenChange: (open: boolean) => void;
   loaId: string;
   loaValue: number;
-  receivablePending?: number | null;
-  actualAmountReceived?: number | null;
-  amountDeducted?: number | null;
-  amountPending?: number | null;
-  deductionReason?: string;
+  // Calculated values from bills
+  totalBilled?: number;
+  totalReceived?: number;
+  totalDeducted?: number;
+  totalPending?: number;
+  // Manual override values
+  manualTotalBilled?: number;
+  manualTotalReceived?: number;
+  manualTotalDeducted?: number;
+  // Pending breakdown
+  recoverablePending?: number | null;
+  paymentPending?: number | null;
   onUpdate: (data: {
-    receivablePending?: number;
-    actualAmountReceived?: number;
-    amountDeducted?: number;
-    amountPending?: number;
-    deductionReason?: string;
+    manualTotalBilled?: number;
+    manualTotalReceived?: number;
+    manualTotalDeducted?: number;
+    recoverablePending: number;
   }) => Promise<void>;
   loading?: boolean;
 }
@@ -39,20 +46,23 @@ export function LOAFinancialForm({
   onOpenChange,
   loaId: _loaId,
   loaValue,
-  receivablePending,
-  actualAmountReceived,
-  amountDeducted,
-  amountPending,
-  deductionReason,
+  totalBilled = 0,
+  totalReceived = 0,
+  totalDeducted = 0,
+  totalPending = 0,
+  manualTotalBilled,
+  manualTotalReceived,
+  manualTotalDeducted,
+  recoverablePending,
+  paymentPending: _paymentPending,
   onUpdate,
   loading = false,
 }: LOAFinancialFormProps) {
   const [formData, setFormData] = useState({
-    receivablePending: receivablePending || 0,
-    actualAmountReceived: actualAmountReceived || 0,
-    amountDeducted: amountDeducted || 0,
-    amountPending: amountPending || 0,
-    deductionReason: deductionReason || '',
+    manualTotalBilled: manualTotalBilled ?? undefined,
+    manualTotalReceived: manualTotalReceived ?? undefined,
+    manualTotalDeducted: manualTotalDeducted ?? undefined,
+    recoverablePending: recoverablePending || 0,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -60,15 +70,14 @@ export function LOAFinancialForm({
   useEffect(() => {
     if (open) {
       setFormData({
-        receivablePending: receivablePending || 0,
-        actualAmountReceived: actualAmountReceived || 0,
-        amountDeducted: amountDeducted || 0,
-        amountPending: amountPending || 0,
-        deductionReason: deductionReason || '',
+        manualTotalBilled: manualTotalBilled ?? undefined,
+        manualTotalReceived: manualTotalReceived ?? undefined,
+        manualTotalDeducted: manualTotalDeducted ?? undefined,
+        recoverablePending: recoverablePending || 0,
       });
       setErrors({});
     }
-  }, [open, receivablePending, actualAmountReceived, amountDeducted, amountPending, deductionReason]);
+  }, [open, manualTotalBilled, manualTotalReceived, manualTotalDeducted, recoverablePending]);
 
   const formatCurrency = (amount?: number | null) => {
     if (amount === undefined || amount === null) return '₹0.00';
@@ -80,10 +89,10 @@ export function LOAFinancialForm({
   };
 
   const handleNumberChange = (field: keyof typeof formData, value: string) => {
-    const numValue = value === '' ? 0 : parseFloat(value);
+    const numValue = value === '' ? undefined : parseFloat(value);
     setFormData((prev) => ({
       ...prev,
-      [field]: isNaN(numValue) ? 0 : numValue,
+      [field]: numValue === undefined || isNaN(numValue) ? undefined : numValue,
     }));
     // Clear error for this field
     setErrors((prev) => {
@@ -93,33 +102,51 @@ export function LOAFinancialForm({
     });
   };
 
-  const calculateSuggestedPending = () => {
-    const totalReceivables = loaValue;
-    const received = formData.actualAmountReceived || 0;
-    const deducted = formData.amountDeducted || 0;
-    return Math.max(0, totalReceivables - received - deducted);
+  // Calculate display values (manual overrides calculated)
+  const displayBilled = formData.manualTotalBilled ?? totalBilled;
+  const displayReceived = formData.manualTotalReceived ?? totalReceived;
+  const displayDeducted = formData.manualTotalDeducted ?? totalDeducted;
+
+  // Calculate display pending (either manual calculation or calculated from bills)
+  const displayPending =
+    formData.manualTotalBilled !== undefined &&
+    formData.manualTotalReceived !== undefined &&
+    formData.manualTotalDeducted !== undefined
+      ? Math.max(0, formData.manualTotalBilled - formData.manualTotalReceived - formData.manualTotalDeducted)
+      : totalPending;
+
+  // Auto-calculate payment pending
+  const calculatedPaymentPending = Math.max(0, displayPending - (formData.recoverablePending || 0));
+
+  const clearManualOverrides = () => {
+    setFormData((prev) => ({
+      ...prev,
+      manualTotalBilled: undefined,
+      manualTotalReceived: undefined,
+      manualTotalDeducted: undefined,
+    }));
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // Validate non-negative numbers
-    if (formData.receivablePending < 0) {
-      newErrors.receivablePending = 'Cannot be negative';
+    // Validate manual values are non-negative if provided
+    if (formData.manualTotalBilled !== undefined && formData.manualTotalBilled < 0) {
+      newErrors.manualTotalBilled = 'Cannot be negative';
     }
-    if (formData.actualAmountReceived < 0) {
-      newErrors.actualAmountReceived = 'Cannot be negative';
+    if (formData.manualTotalReceived !== undefined && formData.manualTotalReceived < 0) {
+      newErrors.manualTotalReceived = 'Cannot be negative';
     }
-    if (formData.amountDeducted < 0) {
-      newErrors.amountDeducted = 'Cannot be negative';
-    }
-    if (formData.amountPending < 0) {
-      newErrors.amountPending = 'Cannot be negative';
+    if (formData.manualTotalDeducted !== undefined && formData.manualTotalDeducted < 0) {
+      newErrors.manualTotalDeducted = 'Cannot be negative';
     }
 
-    // Require deduction reason if amount deducted > 0
-    if (formData.amountDeducted > 0 && !formData.deductionReason.trim()) {
-      newErrors.deductionReason = 'Required when amount is deducted';
+    // Validate recoverable pending
+    if (formData.recoverablePending < 0) {
+      newErrors.recoverablePending = 'Cannot be negative';
+    }
+    if (formData.recoverablePending > displayPending) {
+      newErrors.recoverablePending = `Cannot exceed Total Pending (${formatCurrency(displayPending)})`;
     }
 
     setErrors(newErrors);
@@ -131,11 +158,10 @@ export function LOAFinancialForm({
 
     try {
       await onUpdate({
-        receivablePending: formData.receivablePending,
-        actualAmountReceived: formData.actualAmountReceived,
-        amountDeducted: formData.amountDeducted,
-        amountPending: formData.amountPending,
-        deductionReason: formData.deductionReason || undefined,
+        manualTotalBilled: formData.manualTotalBilled,
+        manualTotalReceived: formData.manualTotalReceived,
+        manualTotalDeducted: formData.manualTotalDeducted,
+        recoverablePending: formData.recoverablePending,
       });
       onOpenChange(false); // Close dialog on success
     } catch (error) {
@@ -145,137 +171,246 @@ export function LOAFinancialForm({
 
   const handleCancel = () => {
     setFormData({
-      receivablePending: receivablePending || 0,
-      actualAmountReceived: actualAmountReceived || 0,
-      amountDeducted: amountDeducted || 0,
-      amountPending: amountPending || 0,
-      deductionReason: deductionReason || '',
+      manualTotalBilled: manualTotalBilled ?? undefined,
+      manualTotalReceived: manualTotalReceived ?? undefined,
+      manualTotalDeducted: manualTotalDeducted ?? undefined,
+      recoverablePending: recoverablePending || 0,
     });
     setErrors({});
     onOpenChange(false);
   };
 
-  const suggestedPending = calculateSuggestedPending();
-  const showCalculationHint = suggestedPending !== formData.amountPending;
+  const hasManualOverrides =
+    formData.manualTotalBilled !== undefined ||
+    formData.manualTotalReceived !== undefined ||
+    formData.manualTotalDeducted !== undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Update LOA Financial Data</DialogTitle>
+          <DialogTitle>LOA Financial Overview</DialogTitle>
           <DialogDescription>
-            Manually update LOA-level financial totals (across all bills)
+            View LOA-level financial summary and manage pending breakdown
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-6 py-4">
+          {/* Section 1: Order Overview */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold">Order Overview</h3>
+            </div>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-blue-900">Total Receivables (Order Value)</span>
+                <span className="text-lg font-bold text-blue-900">{formatCurrency(loaValue)}</span>
+              </div>
+              <p className="text-xs text-blue-700 mt-1">
+                This is the total value of the LOA/PO
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Section 2: Billing Summary (Editable with manual overrides) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Billing Summary</h3>
+                <Edit3 className="h-4 w-4 text-muted-foreground" />
+              </div>
+              {hasManualOverrides && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearManualOverrides}
+                  className="text-xs h-7"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clear Manual Overrides
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter manual overrides for historical data, or leave blank to use calculated values from bills
+            </p>
+
+            {/* Total Billed Row */}
             <div className="space-y-2">
-              <Label htmlFor="receivablePending">
-                Receivable Pending
+              <div className="flex items-center justify-between">
+                <Label htmlFor="manualTotalBilled" className="text-sm">
+                  Total Billed
+                </Label>
+                <Badge variant={formData.manualTotalBilled !== undefined ? "secondary" : "default"} className="text-xs">
+                  {formData.manualTotalBilled !== undefined ? "Manual" : "From Bills"}
+                </Badge>
+              </div>
+              <div className="flex gap-3 items-center">
+                <div className="flex-1">
+                  <Input
+                    id="manualTotalBilled"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.manualTotalBilled ?? ''}
+                    onChange={(e) => handleNumberChange('manualTotalBilled', e.target.value)}
+                    placeholder={`Calculated: ${formatCurrency(totalBilled)}`}
+                  />
+                  {errors.manualTotalBilled && (
+                    <p className="text-sm text-red-600 mt-1">{errors.manualTotalBilled}</p>
+                  )}
+                </div>
+                <div className="w-36 text-right">
+                  <p className="text-xs text-muted-foreground">Display:</p>
+                  <p className="text-base font-semibold">{formatCurrency(displayBilled)}</p>
+                </div>
+              </div>
+              {totalBilled > 0 && (
+                <p className="text-xs text-muted-foreground">Calculated from bills: {formatCurrency(totalBilled)}</p>
+              )}
+            </div>
+
+            {/* Total Received Row */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="manualTotalReceived" className="text-sm">
+                  Total Received
+                </Label>
+                <Badge variant={formData.manualTotalReceived !== undefined ? "secondary" : "default"} className="text-xs">
+                  {formData.manualTotalReceived !== undefined ? "Manual" : "From Bills"}
+                </Badge>
+              </div>
+              <div className="flex gap-3 items-center">
+                <div className="flex-1">
+                  <Input
+                    id="manualTotalReceived"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.manualTotalReceived ?? ''}
+                    onChange={(e) => handleNumberChange('manualTotalReceived', e.target.value)}
+                    placeholder={`Calculated: ${formatCurrency(totalReceived)}`}
+                  />
+                  {errors.manualTotalReceived && (
+                    <p className="text-sm text-red-600 mt-1">{errors.manualTotalReceived}</p>
+                  )}
+                </div>
+                <div className="w-36 text-right">
+                  <p className="text-xs text-muted-foreground">Display:</p>
+                  <p className="text-base font-semibold text-green-700">{formatCurrency(displayReceived)}</p>
+                </div>
+              </div>
+              {totalReceived > 0 && (
+                <p className="text-xs text-muted-foreground">Calculated from bills: {formatCurrency(totalReceived)}</p>
+              )}
+            </div>
+
+            {/* Total Deducted Row */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="manualTotalDeducted" className="text-sm">
+                  Total Deductions
+                </Label>
+                <Badge variant={formData.manualTotalDeducted !== undefined ? "secondary" : "default"} className="text-xs">
+                  {formData.manualTotalDeducted !== undefined ? "Manual" : "From Bills"}
+                </Badge>
+              </div>
+              <div className="flex gap-3 items-center">
+                <div className="flex-1">
+                  <Input
+                    id="manualTotalDeducted"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.manualTotalDeducted ?? ''}
+                    onChange={(e) => handleNumberChange('manualTotalDeducted', e.target.value)}
+                    placeholder={`Calculated: ${formatCurrency(totalDeducted)}`}
+                  />
+                  {errors.manualTotalDeducted && (
+                    <p className="text-sm text-red-600 mt-1">{errors.manualTotalDeducted}</p>
+                  )}
+                </div>
+                <div className="w-36 text-right">
+                  <p className="text-xs text-muted-foreground">Display:</p>
+                  <p className="text-base font-semibold text-orange-700">{formatCurrency(displayDeducted)}</p>
+                </div>
+              </div>
+              {totalDeducted > 0 && (
+                <p className="text-xs text-muted-foreground">Calculated from bills: {formatCurrency(totalDeducted)}</p>
+              )}
+            </div>
+
+            {/* Total Pending - Calculated Display */}
+            <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-md">
+              <div className="flex justify-between items-center">
+                <Label className="text-sm font-semibold text-amber-900">Total Pending</Label>
+                <p className="text-xl font-bold text-amber-900">{formatCurrency(displayPending)}</p>
+              </div>
+              <p className="text-xs text-amber-700 mt-1">
+                = Billed - Received - Deducted
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Section 3: Pending Breakdown */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold">Pending Breakdown</h3>
+              <span className="text-red-500">*</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Specify how much of the pending amount is recoverable (SD/FDR/Other). Payment pending is automatically calculated.
+            </p>
+
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Payment Pending = Total Pending - Recoverable Pending
+              </AlertDescription>
+            </Alert>
+
+            {/* Recoverable Pending - Editable */}
+            <div className="space-y-2">
+              <Label htmlFor="recoverablePending" className="text-sm">
+                Recoverable Pending
                 <span className="text-xs text-muted-foreground ml-2">(SD/FDR/Other)</span>
               </Label>
               <Input
-                id="receivablePending"
+                id="recoverablePending"
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.receivablePending}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNumberChange('receivablePending', e.target.value)}
+                max={displayPending}
+                value={formData.recoverablePending}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNumberChange('recoverablePending', e.target.value)}
                 placeholder="0.00"
               />
-              {errors.receivablePending && (
-                <p className="text-sm text-red-600">{errors.receivablePending}</p>
+              {errors.recoverablePending && (
+                <p className="text-sm text-red-600">{errors.recoverablePending}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Maximum: {formatCurrency(displayPending)}
+              </p>
             </div>
 
+            {/* Payment Pending - Auto-calculated (Read-only) */}
             <div className="space-y-2">
-              <Label htmlFor="actualAmountReceived">Actual Amount Received</Label>
-              <Input
-                id="actualAmountReceived"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.actualAmountReceived}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNumberChange('actualAmountReceived', e.target.value)}
-                placeholder="0.00"
-              />
-              {errors.actualAmountReceived && (
-                <p className="text-sm text-red-600">{errors.actualAmountReceived}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="amountDeducted">Amount Deducted</Label>
-              <Input
-                id="amountDeducted"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.amountDeducted}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNumberChange('amountDeducted', e.target.value)}
-                placeholder="0.00"
-              />
-              {errors.amountDeducted && (
-                <p className="text-sm text-red-600">{errors.amountDeducted}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amountPending">Amount Pending</Label>
-              <Input
-                id="amountPending"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.amountPending}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleNumberChange('amountPending', e.target.value)}
-                placeholder="0.00"
-              />
-              {errors.amountPending && (
-                <p className="text-sm text-red-600">{errors.amountPending}</p>
-              )}
-            </div>
-          </div>
-
-          {showCalculationHint && (
-            <Alert>
-              <Calculator className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Suggested Amount Pending:</strong> {formatCurrency(suggestedPending)}
-                <br />
-                <span className="text-xs text-muted-foreground">
-                  Formula: LOA Value ({formatCurrency(loaValue)}) - Received ({formatCurrency(formData.actualAmountReceived)}) - Deducted ({formatCurrency(formData.amountDeducted)})
-                </span>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {formData.amountDeducted > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="deductionReason">
-                Deduction Reason
-                <span className="text-red-500 ml-1">*</span>
+              <Label className="text-sm">
+                Payment Pending
+                <span className="text-xs text-muted-foreground ml-2">(Auto-calculated)</span>
               </Label>
-              <Textarea
-                id="deductionReason"
-                value={formData.deductionReason}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    deductionReason: e.target.value,
-                  }))
-                }
-                placeholder="Enter reason for deduction"
-                rows={3}
-              />
-              {errors.deductionReason && (
-                <p className="text-sm text-red-600">{errors.deductionReason}</p>
-              )}
+              <div className="p-3 bg-muted border border-input rounded-md">
+                <p className="text-lg font-semibold">{formatCurrency(calculatedPaymentPending)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  = {formatCurrency(displayPending)} - {formatCurrency(formData.recoverablePending)}
+                </p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
 
         <DialogFooter>

@@ -29,16 +29,16 @@ import { UserRole } from '../../../domain/entities/User';
  *                 type: string
  *               invoiceAmount:
  *                 type: number
- *               totalReceivables:
+ *                 description: Total invoice amount
+ *               amountReceived:
  *                 type: number
- *               actualAmountReceived:
- *                 type: number
+ *                 description: Amount received for this invoice
  *               amountDeducted:
  *                 type: number
- *               amountPending:
- *                 type: number
+ *                 description: Amount deducted for this invoice
  *               deductionReason:
  *                 type: string
+ *                 description: Reason for deduction (required if amountDeducted > 0)
  *               billLinks:
  *                 type: string
  *               remarks:
@@ -109,16 +109,16 @@ import { UserRole } from '../../../domain/entities/User';
  *                 type: string
  *               invoiceAmount:
  *                 type: number
- *               totalReceivables:
+ *                 description: Total invoice amount
+ *               amountReceived:
  *                 type: number
- *               actualAmountReceived:
- *                 type: number
+ *                 description: Amount received for this invoice
  *               amountDeducted:
  *                 type: number
- *               amountPending:
- *                 type: number
+ *                 description: Amount deducted for this invoice
  *               deductionReason:
  *                 type: string
+ *                 description: Reason for deduction (required if amountDeducted > 0)
  *               billLinks:
  *                 type: string
  *               remarks:

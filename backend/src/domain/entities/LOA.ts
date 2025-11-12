@@ -47,11 +47,17 @@ export interface LOA {
     sdFdrId?: string;
     hasPg: boolean;
     pgFdrId?: string;
-    receivablePending?: number;
-    actualAmountReceived?: number;
-    amountDeducted?: number;
-    amountPending?: number;
-    deductionReason?: string;
+    recoverablePending: number;
+    paymentPending: number;
+    // Manual override fields (for historical data entry)
+    manualTotalBilled?: number;
+    manualTotalReceived?: number;
+    manualTotalDeducted?: number;
+    // Calculated fields (populated from invoices)
+    totalBilled?: number;
+    totalReceived?: number;
+    totalDeducted?: number;
+    totalPending?: number;
     sdFdr?: {
         id: string;
         bankName: string;

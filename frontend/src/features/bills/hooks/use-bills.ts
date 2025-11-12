@@ -6,10 +6,8 @@ import type { Invoice, BillStatus } from '../../loas/types/loa';
 export interface CreateBillData {
   invoiceNumber?: string;
   invoiceAmount?: number;
-  totalReceivables?: number;
-  actualAmountReceived?: number;
+  amountReceived?: number;
   amountDeducted?: number;
-  amountPending?: number;
   deductionReason?: string;
   billLinks?: string;
   remarks?: string;
@@ -18,6 +16,14 @@ export interface CreateBillData {
 }
 
 export interface UpdateBillData extends CreateBillData {}
+
+// Helper to calculate pending amount
+export function calculatePending(invoiceAmount?: number, amountReceived?: number, amountDeducted?: number): number {
+  const invoice = invoiceAmount || 0;
+  const received = amountReceived || 0;
+  const deducted = amountDeducted || 0;
+  return Math.max(0, invoice - received - deducted);
+}
 
 export function useBills() {
   const [loading, setLoading] = useState(false);
@@ -72,10 +78,8 @@ export function useBills() {
 
       if (data.invoiceNumber) formData.append('invoiceNumber', data.invoiceNumber);
       if (data.invoiceAmount !== undefined) formData.append('invoiceAmount', data.invoiceAmount.toString());
-      if (data.totalReceivables !== undefined) formData.append('totalReceivables', data.totalReceivables.toString());
-      if (data.actualAmountReceived !== undefined) formData.append('actualAmountReceived', data.actualAmountReceived.toString());
+      if (data.amountReceived !== undefined) formData.append('amountReceived', data.amountReceived.toString());
       if (data.amountDeducted !== undefined) formData.append('amountDeducted', data.amountDeducted.toString());
-      if (data.amountPending !== undefined) formData.append('amountPending', data.amountPending.toString());
       if (data.deductionReason) formData.append('deductionReason', data.deductionReason);
       if (data.billLinks) formData.append('billLinks', data.billLinks);
       if (data.remarks) formData.append('remarks', data.remarks);
@@ -107,10 +111,8 @@ export function useBills() {
 
       if (data.invoiceNumber !== undefined) formData.append('invoiceNumber', data.invoiceNumber);
       if (data.invoiceAmount !== undefined) formData.append('invoiceAmount', data.invoiceAmount.toString());
-      if (data.totalReceivables !== undefined) formData.append('totalReceivables', data.totalReceivables.toString());
-      if (data.actualAmountReceived !== undefined) formData.append('actualAmountReceived', data.actualAmountReceived.toString());
+      if (data.amountReceived !== undefined) formData.append('amountReceived', data.amountReceived.toString());
       if (data.amountDeducted !== undefined) formData.append('amountDeducted', data.amountDeducted.toString());
-      if (data.amountPending !== undefined) formData.append('amountPending', data.amountPending.toString());
       if (data.deductionReason !== undefined) formData.append('deductionReason', data.deductionReason);
       if (data.billLinks !== undefined) formData.append('billLinks', data.billLinks);
       if (data.remarks !== undefined) formData.append('remarks', data.remarks);

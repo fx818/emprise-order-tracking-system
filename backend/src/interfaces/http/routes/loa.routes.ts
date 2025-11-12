@@ -334,5 +334,148 @@ export function loaRoutes(controller: LoaController) {
     controller.bulkImport
   );
 
+  /**
+   * @swagger
+   * /loas/{id}/financials:
+   *   get:
+   *     tags: [LOA]
+   *     summary: Get LOA with complete financial calculations
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: LOA ID
+   *     responses:
+   *       200:
+   *         description: LOA with financial totals
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 totalReceivables:
+   *                   type: number
+   *                   description: Total receivables (= LOA value)
+   *                 totalBilled:
+   *                   type: number
+   *                   description: Sum of all invoice amounts
+   *                 totalReceived:
+   *                   type: number
+   *                   description: Sum of all amounts received
+   *                 totalDeducted:
+   *                   type: number
+   *                   description: Sum of all amounts deducted
+   *                 totalPending:
+   *                   type: number
+   *                   description: Total pending (calculated)
+   *                 recoverablePending:
+   *                   type: number
+   *                   description: Recoverable portion of pending
+   *                 paymentPending:
+   *                   type: number
+   *                   description: Payment portion of pending
+   *       404:
+   *         description: LOA not found
+   */
+  router.get(
+    '/:id/financials',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF, UserRole.USER]),
+    controller.getLoaWithFinancials
+  );
+
+  /**
+   * @swagger
+   * /loas/{id}/pending-split:
+   *   put:
+   *     tags: [LOA]
+   *     summary: Update pending split (recoverable vs payment)
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: LOA ID
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - recoverablePending
+   *               - paymentPending
+   *             properties:
+   *               recoverablePending:
+   *                 type: number
+   *                 description: Recoverable portion of pending
+   *               paymentPending:
+   *                 type: number
+   *                 description: Payment portion of pending
+   *     responses:
+   *       200:
+   *         description: Pending split updated successfully
+   *       400:
+   *         description: Invalid split (must sum to total pending)
+   *       404:
+   *         description: LOA not found
+   */
+  router.put(
+    '/:id/pending-split',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
+    controller.updatePendingSplit
+  );
+
+  /**
+   * @swagger
+   * /loas/{id}/manual-financials:
+   *   put:
+   *     tags: [LOA]
+   *     summary: Update manual financial overrides for historical data
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: LOA ID
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               manualTotalBilled:
+   *                 type: number
+   *                 description: Manual override for total billed
+   *               manualTotalReceived:
+   *                 type: number
+   *                 description: Manual override for total received
+   *               manualTotalDeducted:
+   *                 type: number
+   *                 description: Manual override for total deducted
+   *     responses:
+   *       200:
+   *         description: Manual financials updated successfully
+   *       400:
+   *         description: Invalid values (must be non-negative)
+   *       404:
+   *         description: LOA not found
+   */
+  router.put(
+    '/:id/manual-financials',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
+    controller.updateManualFinancials
+  );
+
   return router;
 }

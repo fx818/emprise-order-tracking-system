@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import type { Invoice, BillStatus } from '../../loas/types/loa';
 import type { CreateBillData, UpdateBillData } from '../hooks/use-bills';
+import { calculatePending } from '../hooks/use-bills';
 
 interface BillFormProps {
   open: boolean;
@@ -39,12 +40,22 @@ export function BillForm({
   const [formData, setFormData] = useState<CreateBillData>({
     invoiceNumber: '',
     invoiceAmount: undefined,
+    amountReceived: 0,
+    amountDeducted: 0,
+    deductionReason: '',
     billLinks: '',
     remarks: '',
     status: 'REGISTERED',
   });
 
   const [pdfFile, setPdfFile] = useState<File | undefined>();
+
+  // Calculate pending amount
+  const pendingAmount = calculatePending(
+    formData.invoiceAmount,
+    formData.amountReceived,
+    formData.amountDeducted
+  );
 
   // Update form data when initialData or open state changes
   useEffect(() => {
@@ -53,6 +64,9 @@ export function BillForm({
         setFormData({
           invoiceNumber: initialData.invoiceNumber || '',
           invoiceAmount: initialData.invoiceAmount || undefined,
+          amountReceived: initialData.amountReceived || 0,
+          amountDeducted: initialData.amountDeducted || 0,
+          deductionReason: initialData.deductionReason || '',
           billLinks: initialData.billLinks || '',
           remarks: initialData.remarks || '',
           status: initialData.status || 'REGISTERED',
@@ -62,6 +76,9 @@ export function BillForm({
         setFormData({
           invoiceNumber: '',
           invoiceAmount: undefined,
+          amountReceived: 0,
+          amountDeducted: 0,
+          deductionReason: '',
           billLinks: '',
           remarks: '',
           status: 'REGISTERED',
@@ -136,6 +153,56 @@ export function BillForm({
               onChange={(e) => handleNumberChange('invoiceAmount', e.target.value)}
               placeholder="0.00"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="amountReceived">Amount Received</Label>
+              <Input
+                id="amountReceived"
+                type="number"
+                step="0.01"
+                value={formData.amountReceived || 0}
+                onChange={(e) => handleNumberChange('amountReceived', e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="amountDeducted">Amount Deducted</Label>
+              <Input
+                id="amountDeducted"
+                type="number"
+                step="0.01"
+                value={formData.amountDeducted || 0}
+                onChange={(e) => handleNumberChange('amountDeducted', e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          {(formData.amountDeducted || 0) > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="deductionReason">Deduction Reason</Label>
+              <Input
+                id="deductionReason"
+                value={formData.deductionReason}
+                onChange={(e) => setFormData({ ...formData, deductionReason: e.target.value })}
+                placeholder="Enter reason for deduction"
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Amount Pending (Calculated)</Label>
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm font-medium">
+                ₹{pendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                = Invoice Amount - Received - Deducted
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">

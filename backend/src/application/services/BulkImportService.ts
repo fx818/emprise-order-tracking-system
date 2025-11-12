@@ -597,35 +597,29 @@ export class BulkImportService {
                 ...(pocId && { poc: { connect: { id: pocId } } }), // Link to POC table via relation
                 fdBgDetails: row.fdBgDetails || null,
                 daysToDueDateFromExcel: this.parseDaysToDueDate(row.daysToDueDate),
-                // LOA-level billing fields (total across all bills)
-                actualAmountReceived: row.actualAmountReceived,
-                amountDeducted: row.amountDeducted,
-                amountPending: row.amountPending,
-                deductionReason: row.reasonForDeduction,
+                // LOA-level financial data (historical data from bulk import)
+                // These are totals for the entire LOA, not individual bills
+                manualTotalBilled: row.lastInvoiceAmount || null,
+                manualTotalReceived: row.actualAmountReceived || null,
+                manualTotalDeducted: row.amountDeducted || null,
+                // Pending breakdown fields (initialized to 0, can be updated later)
+                recoverablePending: 0,
+                paymentPending: 0,
               },
               include: {
                 site: true
               }
             });
 
-            // Create Bill/Invoice for last invoice details if ANY invoice data exists
-            const hasBillingData = row.lastInvoiceNo || row.lastInvoiceAmount || row.billLinks;
-
-            if (hasBillingData) {
-              console.log(`Creating bill for LOA ${row.loaNumber}: Invoice No="${row.lastInvoiceNo || 'N/A'}", Amount=${row.lastInvoiceAmount || 0}`);
-              await tx.invoice.create({
-                data: {
-                  loaId: loa.id,
-                  invoiceNumber: row.lastInvoiceNo || null,
-                  invoiceAmount: row.lastInvoiceAmount || null,
-                  billLinks: row.billLinks || null,
-                  // Set status based on LOA-level payment status
-                  status: row.actualAmountReceived ? 'PAYMENT_MADE' : 'REGISTERED',
-                }
-              });
-            } else {
-              console.log(`No billing data found for LOA ${row.loaNumber}, skipping bill creation`);
-            }
+            // Note: For bulk import, financial data (actualAmountReceived, amountDeducted)
+            // represents LOA-level totals, not individual bill data.
+            // Bills can be added manually later for ongoing work.
+            console.log(`Created LOA ${row.loaNumber} with LOA-level financial data:`, {
+              loaValue: row.orderValue,
+              manualTotalBilled: row.lastInvoiceAmount,
+              manualTotalReceived: row.actualAmountReceived,
+              manualTotalDeducted: row.amountDeducted,
+            });
 
             return loa;
           });

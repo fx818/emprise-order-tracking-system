@@ -94,7 +94,7 @@ const getStatusDisplayText = (status: LOA['status']) => {
 export function LOADetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { loading, getLOAById, updateLOA, deleteLOA, deleteAmendment, createOtherDocument, deleteOtherDocument } = useLOAs();
+  const { loading, getLOAById, deleteLOA, deleteAmendment, createOtherDocument, deleteOtherDocument, updatePendingSplit, updateManualFinancials } = useLOAs();
   const { loading: billsLoading, getBillsByLoaId, createBill, updateBill, deleteBill } = useBills();
   const [loa, setLOA] = useState<LOA | null>(null);
   const [bills, setBills] = useState<Invoice[]>([]);
@@ -257,6 +257,7 @@ export function LOADetail() {
       setBillFormOpen(false);
       setEditingBill(undefined);
       fetchBills();
+      fetchLOA();
     } catch (error) {
       console.error('Error saving bill:', error);
     }
@@ -266,6 +267,7 @@ export function LOADetail() {
     try {
       await deleteBill(billId);
       fetchBills();
+      fetchLOA();
     } catch (error) {
       console.error('Error deleting bill:', error);
     }
@@ -273,16 +275,23 @@ export function LOADetail() {
 
   // Financial data update handler
   const handleFinancialUpdate = async (data: {
-    receivablePending?: number;
-    actualAmountReceived?: number;
-    amountDeducted?: number;
-    amountPending?: number;
-    deductionReason?: string;
+    manualTotalBilled?: number;
+    manualTotalReceived?: number;
+    manualTotalDeducted?: number;
+    recoverablePending: number;
   }) => {
     if (!id) return;
 
     try {
-      await updateLOA(id, data);
+      // Update manual financial overrides and recoverable pending in a single transaction
+      await updateManualFinancials(
+        id,
+        data.manualTotalBilled,
+        data.manualTotalReceived,
+        data.manualTotalDeducted,
+        data.recoverablePending
+      );
+
       // Refresh LOA details after update
       fetchLOA();
     } catch (error) {
@@ -730,13 +739,33 @@ export function LOADetail() {
             {/* Bill Analytics with Edit Button */}
             <BillAnalytics
               loaValue={loa.loaValue}
-              receivablePending={loa.receivablePending ?? undefined}
               bills={bills}
-              loaActualAmountReceived={loa.actualAmountReceived ?? undefined}
-              loaAmountDeducted={loa.amountDeducted ?? undefined}
-              loaAmountPending={loa.amountPending ?? undefined}
-              loaDeductionReason={loa.deductionReason}
+              totalBilled={loa.totalBilled}
+              totalReceived={loa.totalReceived}
+              totalDeducted={loa.totalDeducted}
+              totalPending={loa.totalPending}
+              manualTotalBilled={loa.manualTotalBilled}
+              manualTotalReceived={loa.manualTotalReceived}
+              manualTotalDeducted={loa.manualTotalDeducted}
+              recoverablePending={loa.recoverablePending}
+              paymentPending={loa.paymentPending}
               onEditClick={() => setFinancialDialogOpen(true)}
+              onRecoverablePendingChange={async (value: number) => {
+                if (!id) return;
+                try {
+                  const displayPending =
+                    loa.manualTotalBilled !== undefined &&
+                    loa.manualTotalReceived !== undefined &&
+                    loa.manualTotalDeducted !== undefined
+                      ? Math.max(0, loa.manualTotalBilled - loa.manualTotalReceived - loa.manualTotalDeducted)
+                      : loa.totalPending || 0;
+                  const paymentPending = Math.max(0, displayPending - value);
+                  await updatePendingSplit(id, value, paymentPending);
+                  fetchLOA();
+                } catch (error) {
+                  console.error('Error updating recoverable pending:', error);
+                }
+              }}
             />
 
             {/* Bills List */}
@@ -1161,11 +1190,15 @@ export function LOADetail() {
           onOpenChange={setFinancialDialogOpen}
           loaId={loa.id}
           loaValue={loa.loaValue}
-          receivablePending={loa.receivablePending}
-          actualAmountReceived={loa.actualAmountReceived}
-          amountDeducted={loa.amountDeducted}
-          amountPending={loa.amountPending}
-          deductionReason={loa.deductionReason}
+          totalBilled={loa.totalBilled}
+          totalReceived={loa.totalReceived}
+          totalDeducted={loa.totalDeducted}
+          totalPending={loa.totalPending}
+          manualTotalBilled={loa.manualTotalBilled}
+          manualTotalReceived={loa.manualTotalReceived}
+          manualTotalDeducted={loa.manualTotalDeducted}
+          recoverablePending={loa.recoverablePending}
+          paymentPending={loa.paymentPending}
           onUpdate={handleFinancialUpdate}
           loading={loading}
         />

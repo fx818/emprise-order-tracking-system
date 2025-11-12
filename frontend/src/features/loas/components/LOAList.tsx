@@ -434,7 +434,7 @@ export function LOAList(_props: LOAListProps = {}) {
         new Intl.NumberFormat("en-IN", {
           style: "currency",
           currency: "INR",
-        }).format(row.actualAmountReceived || 0),
+        }).format(row.totalReceived || 0),
     },
     {
       header: "Amount Pending",
@@ -442,7 +442,7 @@ export function LOAList(_props: LOAListProps = {}) {
         new Intl.NumberFormat("en-IN", {
           style: "currency",
           currency: "INR",
-        }).format(row.amountPending || 0),
+        }).format(row.totalPending || 0),
     },
     {
       header: "Actions",

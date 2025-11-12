@@ -7,12 +7,14 @@ import { UpdateBillDto } from '../dtos/bill/UpdateBillDto';
 import { BillResponseDto } from '../dtos/bill/BillResponseDto';
 import { Result, ResultUtils } from '../../shared/types/common.types';
 import { AppError } from '../../shared/errors/AppError';
-import { BillStatus } from '../../domain/entities/Bill';
+import { BillStatus, calculateBillPending } from '../../domain/entities/Bill';
+import { FinancialCalculationService } from './FinancialCalculationService';
 
 export class BillService {
   constructor(
     private repository: PrismaBillRepository,
-    private storageService: S3Service
+    private storageService: S3Service,
+    private financialService: FinancialCalculationService
   ) {}
 
   private async processBillPdf(file: Express.Multer.File): Promise<string> {
@@ -39,11 +41,24 @@ export class BillService {
   }
 
   private mapToResponseDto(bill: any): BillResponseDto {
+    const invoiceAmount = bill.invoiceAmount || 0;
+    const amountReceived = bill.amountReceived || 0;
+    const amountDeducted = bill.amountDeducted || 0;
+    const amountPending = this.financialService.calculateInvoicePending(
+      invoiceAmount,
+      amountReceived,
+      amountDeducted
+    );
+
     return {
       id: bill.id,
       loaId: bill.loaId,
       invoiceNumber: bill.invoiceNumber,
       invoiceAmount: bill.invoiceAmount,
+      amountReceived: bill.amountReceived,
+      amountDeducted: bill.amountDeducted,
+      amountPending,
+      deductionReason: bill.deductionReason,
       billLinks: bill.billLinks,
       remarks: bill.remarks,
       status: bill.status as BillStatus,
@@ -55,6 +70,26 @@ export class BillService {
 
   async createBill(loaId: string, dto: CreateBillDto): Promise<Result<BillResponseDto>> {
     try {
+      // Validate amounts
+      const invoiceAmount = dto.invoiceAmount || 0;
+      const amountReceived = dto.amountReceived || 0;
+      const amountDeducted = dto.amountDeducted || 0;
+
+      const validation = this.financialService.validateInvoiceAmounts(
+        invoiceAmount,
+        amountReceived,
+        amountDeducted
+      );
+
+      if (!validation.valid) {
+        return ResultUtils.fail(validation.error || 'Invalid invoice amounts');
+      }
+
+      // Validate deduction reason if amount is deducted
+      if (amountDeducted > 0 && !dto.deductionReason) {
+        return ResultUtils.fail('Deduction reason is required when amount is deducted');
+      }
+
       // Process bill PDF if provided
       let invoicePdfUrl: string | undefined;
       if (dto.invoicePdfFile) {
@@ -66,6 +101,9 @@ export class BillService {
         loaId,
         invoiceNumber: dto.invoiceNumber,
         invoiceAmount: dto.invoiceAmount,
+        amountReceived: dto.amountReceived || 0,
+        amountDeducted: dto.amountDeducted || 0,
+        deductionReason: dto.deductionReason,
         billLinks: dto.billLinks,
         remarks: dto.remarks,
         status: dto.status || 'REGISTERED',
@@ -106,9 +144,30 @@ export class BillService {
   async updateBill(id: string, dto: UpdateBillDto): Promise<Result<BillResponseDto>> {
     try {
       // Check if bill exists
-      const exists = await this.repository.exists(id);
-      if (!exists) {
+      const existingBill = await this.repository.findById(id);
+      if (!existingBill) {
         return ResultUtils.fail('Bill not found');
+      }
+
+      // Validate amounts if any are being updated
+      const invoiceAmount = dto.invoiceAmount !== undefined ? dto.invoiceAmount : existingBill.invoiceAmount || 0;
+      const amountReceived = dto.amountReceived !== undefined ? dto.amountReceived : existingBill.amountReceived || 0;
+      const amountDeducted = dto.amountDeducted !== undefined ? dto.amountDeducted : existingBill.amountDeducted || 0;
+
+      const validation = this.financialService.validateInvoiceAmounts(
+        invoiceAmount,
+        amountReceived,
+        amountDeducted
+      );
+
+      if (!validation.valid) {
+        return ResultUtils.fail(validation.error || 'Invalid invoice amounts');
+      }
+
+      // Validate deduction reason if amount is deducted
+      const finalDeductionReason = dto.deductionReason !== undefined ? dto.deductionReason : existingBill.deductionReason;
+      if (amountDeducted > 0 && !finalDeductionReason) {
+        return ResultUtils.fail('Deduction reason is required when amount is deducted');
       }
 
       // Process bill PDF if provided
@@ -121,6 +180,9 @@ export class BillService {
       const bill = await this.repository.update(id, {
         invoiceNumber: dto.invoiceNumber,
         invoiceAmount: dto.invoiceAmount,
+        amountReceived: dto.amountReceived,
+        amountDeducted: dto.amountDeducted,
+        deductionReason: dto.deductionReason,
         billLinks: dto.billLinks,
         remarks: dto.remarks,
         status: dto.status,

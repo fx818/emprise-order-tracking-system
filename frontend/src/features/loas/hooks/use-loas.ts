@@ -435,6 +435,68 @@ export function useLOAs() {
     }
   };
 
+  // Get LOA with complete financial calculations
+  const getLoaWithFinancials = async (id: string): Promise<LOA | null> => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get(`/loas/${id}/financials`);
+      return response.data;
+    } catch (error: any) {
+      handleError(error, 'Failed to fetch LOA financials');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update pending split (recoverable vs payment)
+  const updatePendingSplit = async (
+    id: string,
+    recoverablePending: number,
+    paymentPending: number
+  ): Promise<LOA | null> => {
+    try {
+      setLoading(true);
+      const response = await apiClient.put(`/loas/${id}/pending-split`, {
+        recoverablePending,
+        paymentPending,
+      });
+      showSuccess('Pending split updated successfully');
+      return response.data;
+    } catch (error: any) {
+      handleError(error, 'Failed to update pending split');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update manual financial overrides (for historical data entry)
+  const updateManualFinancials = async (
+    id: string,
+    manualTotalBilled?: number,
+    manualTotalReceived?: number,
+    manualTotalDeducted?: number,
+    recoverablePending?: number
+  ): Promise<LOA | null> => {
+    try {
+      setLoading(true);
+      const response = await apiClient.put(`/loas/${id}/manual-financials`, {
+        manualTotalBilled,
+        manualTotalReceived,
+        manualTotalDeducted,
+        recoverablePending,
+      });
+      showSuccess('Financial data updated successfully');
+      return response.data;
+    } catch (error: any) {
+      handleError(error, 'Failed to update financial data');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     getLOAs,
@@ -451,5 +513,8 @@ export function useLOAs() {
     updateLOAStatus,
     getAvailableEMDs,
     bulkImportLOAs,
+    getLoaWithFinancials,
+    updatePendingSplit,
+    updateManualFinancials,
   };
 }

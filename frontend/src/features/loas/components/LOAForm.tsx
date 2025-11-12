@@ -143,12 +143,6 @@ export function LOAForm({
       sdFdrId: initialData?.sdFdrId || null,
       hasPg: initialData?.hasPg || false,
       pgFdrId: initialData?.pgFdrId || null,
-      receivablePending: initialData?.receivablePending || null,
-      // LOA-level billing fields
-      actualAmountReceived: initialData?.actualAmountReceived || null,
-      amountDeducted: initialData?.amountDeducted || null,
-      amountPending: initialData?.amountPending || null,
-      deductionReason: initialData?.deductionReason || '',
       // Warranty fields
       warrantyPeriodMonths: initialData?.warrantyPeriodMonths || null,
       warrantyPeriodYears: initialData?.warrantyPeriodYears || null,
@@ -220,11 +214,6 @@ export function LOAForm({
         sdFdrId: initialData.sdFdrId || null,
         hasPg: initialData.hasPg || false,
         pgFdrId: initialData.pgFdrId || null,
-        receivablePending: initialData.receivablePending || null,
-        actualAmountReceived: initialData.actualAmountReceived || null,
-        amountDeducted: initialData.amountDeducted || null,
-        amountPending: initialData.amountPending || null,
-        deductionReason: initialData.deductionReason || '',
         warrantyPeriodMonths: initialData.warrantyPeriodMonths || null,
         warrantyPeriodYears: initialData.warrantyPeriodYears || null,
         warrantyStartDate: initialData.warrantyStartDate ? new Date(initialData.warrantyStartDate) : null,
@@ -242,7 +231,6 @@ export function LOAForm({
   const hasEmd = form.watch("hasEmd");
   const hasSd = form.watch("hasSd");
   const hasPg = form.watch("hasPg");
-  const amountDeducted = form.watch("amountDeducted");
   const selectedSiteId = form.watch("siteId");
   const selectedTenderId = form.watch("tenderId");
 
@@ -526,19 +514,6 @@ export function LOAForm({
       if (data.hasEmd && (!data.emdAmount || data.emdAmount <= 0)) {
         showError('EMD amount is required when EMD is checked');
         goToStep(1);
-        return;
-      }
-
-      // Step 2: Billing validation
-      if (data.actualAmountReceived && data.actualAmountReceived < 0) {
-        showError('Actual amount received cannot be negative');
-        goToStep(2);
-        return;
-      }
-
-      if (data.amountDeducted && data.amountDeducted > 0 && (!data.deductionReason || data.deductionReason.trim().length === 0)) {
-        showError('Please provide a reason for deduction');
-        goToStep(2);
         return;
       }
 
@@ -1452,153 +1427,6 @@ export function LOAForm({
           )}
         </div>
 
-        {/* Receivable Pending Section */}
-        <div className="space-y-4 border p-4 rounded-md bg-blue-50/30">
-          <h3 className="text-lg font-semibold">Receivable Pending</h3>
-          <FormDescription>
-            Enter pending amounts from SD/FDR or other sources (not from bills)
-          </FormDescription>
-
-          <FormField
-            control={form.control}
-            name="receivablePending"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Receivable Pending Amount</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter amount (e.g., 50000.00)"
-                    {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                      field.onChange(value);
-                    }}
-                  />
-                </FormControl>
-                <FormDescription>
-                  Pending amounts from Security Deposit, FDR, or other sources (excluding bill amounts)
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {/* LOA-Level Billing Totals Section */}
-        <div className="space-y-4 border p-4 rounded-md bg-green-50/30">
-          <h3 className="text-lg font-semibold">LOA-Level Billing Totals</h3>
-          <FormDescription>
-            Total amounts across all bills for this LOA (usually populated from bulk import)
-          </FormDescription>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="actualAmountReceived"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Total Amount Received</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Enter total received (e.g., 450000.00)"
-                      {...field}
-                      value={field.value ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                        field.onChange(value);
-                      }}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Total amount actually received across all bills
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="amountDeducted"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Total Amount Deducted</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Enter total deductions (e.g., 25000.00)"
-                      {...field}
-                      value={field.value ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                        field.onChange(value);
-                      }}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Total deductions across all bills
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <FormField
-            control={form.control}
-            name="amountPending"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Total Amount Pending</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter total pending (e.g., 75000.00)"
-                    {...field}
-                    value={field.value ?? ''}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                      field.onChange(value);
-                    }}
-                  />
-                </FormControl>
-                <FormDescription>
-                  Total pending amount across all bills
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="deductionReason"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Deduction Reason (Optional)</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Enter reason for deductions"
-                    {...field}
-                    value={field.value || ''}
-                  />
-                </FormControl>
-                <FormDescription>
-                  Reason for any deductions from bills
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
         {/* Warranty Period Section */}
         <div className="space-y-4 border p-4 rounded-md">
           <h3 className="text-lg font-semibold">Warranty Period</h3>
@@ -1777,76 +1605,13 @@ export function LOAForm({
             )}
           />
 
-          {/* Financial Fields - 2 column grid */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="invoiceAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Last Invoice Amount (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={field.value || ''}
-                      onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="actualAmountReceived"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Actual Amount Received (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={field.value || ''}
-                      onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="amountPending"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount Pending (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={field.value || ''}
-                      onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Amount Deducted */}
+          {/* Financial Fields */}
           <FormField
             control={form.control}
-            name="amountDeducted"
+            name="invoiceAmount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Amount Deducted (₹)</FormLabel>
+                <FormLabel>Last Invoice Amount (₹)</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -1856,34 +1621,10 @@ export function LOAForm({
                     onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
                   />
                 </FormControl>
-                <FormDescription>
-                  If there was any deduction from the invoice amount
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-
-          {/* Deduction Reason - shown only if amountDeducted > 0 */}
-          {amountDeducted && amountDeducted > 0 && (
-            <FormField
-              control={form.control}
-              name="deductionReason"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Reason for Deduction</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Enter reason for deduction"
-                      className="min-h-[60px]"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
 
           {/* Invoice PDF Upload */}
           <FormField

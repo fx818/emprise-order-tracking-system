@@ -11,6 +11,8 @@ export class BillController {
 
       // Parse numeric values
       const invoiceAmount = req.body.invoiceAmount ? Number(req.body.invoiceAmount) : undefined;
+      const amountReceived = req.body.amountReceived ? Number(req.body.amountReceived) : undefined;
+      const amountDeducted = req.body.amountDeducted ? Number(req.body.amountDeducted) : undefined;
 
       // Process the uploaded file
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -22,6 +24,9 @@ export class BillController {
       const result = await this.service.createBill(loaId, {
         invoiceNumber: req.body.invoiceNumber,
         invoiceAmount,
+        amountReceived,
+        amountDeducted,
+        deductionReason: req.body.deductionReason,
         billLinks: req.body.billLinks,
         remarks: req.body.remarks,
         status,
@@ -82,6 +87,8 @@ export class BillController {
 
       // Parse numeric values
       const invoiceAmount = req.body.invoiceAmount ? Number(req.body.invoiceAmount) : undefined;
+      const amountReceived = req.body.amountReceived !== undefined ? Number(req.body.amountReceived) : undefined;
+      const amountDeducted = req.body.amountDeducted !== undefined ? Number(req.body.amountDeducted) : undefined;
 
       // Process the uploaded file
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -93,6 +100,9 @@ export class BillController {
       const result = await this.service.updateBill(id, {
         invoiceNumber: req.body.invoiceNumber,
         invoiceAmount,
+        amountReceived,
+        amountDeducted,
+        deductionReason: req.body.deductionReason,
         billLinks: req.body.billLinks,
         remarks: req.body.remarks,
         status,

@@ -51,6 +51,7 @@ import { BulkImportFdrService } from './application/services/BulkImportFdrServic
 import { PocService } from './application/services/PocService';
 import { InspectionAgencyService } from './application/services/InspectionAgencyService';
 import { BillService } from './application/services/BillService';
+import { FinancialCalculationService } from './application/services/FinancialCalculationService';
 // Import controllers
 import { AuthController } from './interfaces/http/controllers/AuthController';
 import { BudgetaryOfferController } from './interfaces/http/controllers/BudgetaryOfferController';
@@ -176,7 +177,8 @@ async function startServer() {
     emailService,
     tokenService
   );
-  const loaService = new LoaService(loaRepository, tenderRepository, otherDocumentRepository, s3Service);
+  const financialService = new FinancialCalculationService(billRepository);
+  const loaService = new LoaService(loaRepository, tenderRepository, otherDocumentRepository, billRepository, s3Service, financialService);
   const vendorService = new VendorService(vendorRepository);
   const vendorItemService = new VendorItemService(vendorItemRepository);
   const itemService = new ItemService(itemRepository);
@@ -202,7 +204,7 @@ async function startServer() {
   const fdrService = new FdrService(fdrRepository, s3Service, ocrService, config.openRouterApiKey);
   const pocService = new PocService(pocRepository);
   const inspectionAgencyService = new InspectionAgencyService(inspectionAgencyRepository);
-  const billService = new BillService(billRepository, s3Service);
+  const billService = new BillService(billRepository, s3Service, financialService);
 
   // Initialize controllers
   const authController = new AuthController(authService);

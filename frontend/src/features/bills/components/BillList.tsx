@@ -64,6 +64,17 @@ export function BillList({ bills, onEdit, onDelete, loading: _loading }: BillLis
     }
   };
 
+  // Calculate totals
+  const totals = bills.reduce(
+    (acc, bill) => ({
+      totalBilled: acc.totalBilled + (bill.invoiceAmount || 0),
+      totalReceived: acc.totalReceived + (bill.amountReceived || 0),
+      totalDeducted: acc.totalDeducted + (bill.amountDeducted || 0),
+      totalPending: acc.totalPending + (bill.amountPending || 0),
+    }),
+    { totalBilled: 0, totalReceived: 0, totalDeducted: 0, totalPending: 0 }
+  );
+
   if (bills.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -85,6 +96,9 @@ export function BillList({ bills, onEdit, onDelete, loading: _loading }: BillLis
               <TableHead>Invoice Number</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Invoice Amount</TableHead>
+              <TableHead className="text-right">Received</TableHead>
+              <TableHead className="text-right">Deducted</TableHead>
+              <TableHead className="text-right">Pending</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -100,6 +114,15 @@ export function BillList({ bills, onEdit, onDelete, loading: _loading }: BillLis
                 </TableCell>
                 <TableCell className="text-right">
                   {formatCurrency(bill.invoiceAmount)}
+                </TableCell>
+                <TableCell className="text-right text-green-600">
+                  {formatCurrency(bill.amountReceived)}
+                </TableCell>
+                <TableCell className="text-right text-orange-600">
+                  {formatCurrency(bill.amountDeducted)}
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(bill.amountPending)}
                 </TableCell>
                 <TableCell>{formatDate(bill.createdAt)}</TableCell>
                 <TableCell className="text-right">
@@ -135,6 +158,15 @@ export function BillList({ bills, onEdit, onDelete, loading: _loading }: BillLis
                 </TableCell>
               </TableRow>
             ))}
+            {/* Totals Row */}
+            <TableRow className="bg-muted/50 font-semibold border-t-2">
+              <TableCell colSpan={2}>TOTAL</TableCell>
+              <TableCell className="text-right">{formatCurrency(totals.totalBilled)}</TableCell>
+              <TableCell className="text-right text-green-600">{formatCurrency(totals.totalReceived)}</TableCell>
+              <TableCell className="text-right text-orange-600">{formatCurrency(totals.totalDeducted)}</TableCell>
+              <TableCell className="text-right font-bold">{formatCurrency(totals.totalPending)}</TableCell>
+              <TableCell colSpan={2}></TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       </div>

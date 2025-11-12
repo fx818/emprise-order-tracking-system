@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import { PrismaLoaRepository } from '../../infrastructure/persistence/repositories/PrismaLoaRepository';
 import { PrismaTenderRepository } from '../../infrastructure/persistence/repositories/PrismaTenderRepository';
 import { PrismaOtherDocumentRepository } from '../../infrastructure/persistence/repositories/PrismaOtherDocumentRepository';
+import { PrismaBillRepository } from '../../infrastructure/persistence/repositories/PrismaBillRepository';
 import { S3Service } from '../../infrastructure/services/S3Service';
 import { CreateLoaDto } from '../dtos/loa/CreateLoaDto';
 import { UpdateLoaDto } from '../dtos/loa/UpdateLoaDto';
@@ -14,6 +15,7 @@ import { UpdateStatusDto } from '../dtos/loa/UpdateStatusDto';
 import { Result, ResultUtils } from '../../shared/types/common.types';
 import { LoaValidator } from '../validators/loa.validator';
 import { AppError } from '../../shared/errors/AppError';
+import { FinancialCalculationService } from './FinancialCalculationService';
 import path from 'path';
 
 export class LoaService {
@@ -23,7 +25,9 @@ export class LoaService {
         private repository: PrismaLoaRepository,
         private tenderRepository: PrismaTenderRepository,
         private otherDocumentRepository: PrismaOtherDocumentRepository,
-        private storageService: S3Service
+        private billRepository: PrismaBillRepository,
+        private storageService: S3Service,
+        private financialService: FinancialCalculationService
     ) {
         this.validator = new LoaValidator();
     }
@@ -135,27 +139,9 @@ export class LoaService {
                 warrantyPeriodYears: dto.warrantyPeriodYears,
                 warrantyStartDate: dto.warrantyStartDate ? new Date(dto.warrantyStartDate) : undefined,
                 warrantyEndDate: dto.warrantyEndDate ? new Date(dto.warrantyEndDate) : undefined,
-                // LOA-level billing fields (total across all bills)
-                actualAmountReceived: dto.actualAmountReceived,
-                amountDeducted: dto.amountDeducted,
-                amountPending: dto.amountPending,
-                deductionReason: dto.deductionReason,
+                recoverablePending: dto.recoverablePending ?? 0,
+                paymentPending: dto.paymentPending ?? 0,
             });
-
-            // Step 6: Create Invoice record if billing data exists
-            const hasBillingData = dto.invoiceNumber || dto.invoiceAmount || dto.billLinks;
-
-            if (hasBillingData) {
-                await this.repository.createInvoice({
-                    loaId: loa.id,
-                    invoiceNumber: dto.invoiceNumber,
-                    invoiceAmount: dto.invoiceAmount,
-                    billLinks: dto.billLinks,
-                    invoicePdfUrl: documentUrls.invoicePdfUrl,
-                    remarks: dto.remarks,
-                    status: 'REGISTERED',
-                });
-            }
 
             return ResultUtils.ok(loa);
         } catch (error) {
@@ -170,13 +156,11 @@ export class LoaService {
     private async processDocumentFiles(dto: CreateLoaDto): Promise<{
         success: boolean;
         documentUrl?: string;
-        invoicePdfUrl?: string;
         errorMessage?: string;
     }> {
         try {
             // Initialize empty URLs
             let documentUrl = '';
-            let invoicePdfUrl = '';
 
             // Process main LOA document
             if (dto.documentFile) {
@@ -191,23 +175,9 @@ export class LoaService {
                 }
             }
 
-            // Process invoice PDF (if applicable)
-            if (dto.invoicePdfFile) {
-                try {
-                    invoicePdfUrl = await this.processDocument(dto.invoicePdfFile);
-                } catch (error) {
-                    console.error('Error processing invoice PDF file:', error);
-                    return {
-                        success: false,
-                        errorMessage: 'Failed to process invoice PDF file'
-                    };
-                }
-            }
-
             return {
                 success: true,
-                documentUrl,
-                invoicePdfUrl
+                documentUrl
             };
         } catch (error) {
             console.error('Document processing error:', error);
@@ -245,7 +215,6 @@ export class LoaService {
 
             // Process files
             let documentUrl = existingLoa.documentUrl;
-            let invoicePdfUrl: string | undefined;
 
             if (dto.documentFile) {
                 try {
@@ -253,15 +222,6 @@ export class LoaService {
                 } catch (error) {
                     console.error('Error processing document file:', error);
                     return ResultUtils.fail('Failed to process document file');
-                }
-            }
-
-            if (dto.invoicePdfFile) {
-                try {
-                    invoicePdfUrl = await this.processDocument(dto.invoicePdfFile);
-                } catch (error) {
-                    console.error('Error processing invoice PDF file:', error);
-                    return ResultUtils.fail('Failed to process invoice PDF file');
                 }
             }
 
@@ -309,45 +269,12 @@ export class LoaService {
                 warrantyPeriodYears: dto.warrantyPeriodYears,
                 warrantyStartDate: dto.warrantyStartDate ? new Date(dto.warrantyStartDate) : undefined,
                 warrantyEndDate: dto.warrantyEndDate ? new Date(dto.warrantyEndDate) : undefined,
-                // LOA-level billing fields (total across all bills)
-                actualAmountReceived: dto.actualAmountReceived,
-                amountDeducted: dto.amountDeducted,
-                amountPending: dto.amountPending,
-                deductionReason: dto.deductionReason,
+                recoverablePending: dto.recoverablePending,
+                paymentPending: dto.paymentPending,
             };
 
             // Update the LOA
             const updatedLoa = await this.repository.update(id, updateData);
-
-            // Handle invoice update/creation
-            const hasBillingData = dto.invoiceNumber || dto.invoiceAmount || dto.billLinks;
-
-            if (hasBillingData) {
-                // Check if invoice already exists for this LOA
-                const existingInvoice = await this.repository.findInvoiceByLoaId(id);
-
-                if (existingInvoice) {
-                    // Update existing invoice
-                    await this.repository.updateInvoice(existingInvoice.id, {
-                        invoiceNumber: dto.invoiceNumber,
-                        invoiceAmount: dto.invoiceAmount,
-                        billLinks: dto.billLinks,
-                        invoicePdfUrl: invoicePdfUrl || existingInvoice.invoicePdfUrl,
-                        remarks: dto.remarks,
-                    });
-                } else {
-                    // Create new invoice
-                    await this.repository.createInvoice({
-                        loaId: id,
-                        invoiceNumber: dto.invoiceNumber,
-                        invoiceAmount: dto.invoiceAmount,
-                        billLinks: dto.billLinks,
-                        invoicePdfUrl,
-                        remarks: dto.remarks,
-                        status: 'REGISTERED',
-                    });
-                }
-            }
 
             return ResultUtils.ok(updatedLoa);
         } catch (error) {
@@ -701,6 +628,186 @@ export class LoaService {
         } catch (error) {
             console.error('LOA Status Update Error:', error);
             return ResultUtils.fail('Failed to update LOA status');
+        }
+    }
+
+    /**
+     * Get LOA with complete financial calculations from invoices
+     * Respects manual overrides for historical data
+     */
+    async getLoaWithFinancials(id: string): Promise<Result<any>> {
+        try {
+            const loa = await this.repository.findById(id);
+            if (!loa) {
+                return ResultUtils.fail('LOA not found');
+            }
+
+            // Aggregate invoice totals (calculated from bills)
+            const invoiceTotals = await this.financialService.aggregateInvoiceTotals(id);
+
+            // Use manual overrides if available, otherwise use calculated values
+            const totalBilled = loa.manualTotalBilled !== null && loa.manualTotalBilled !== undefined
+                ? loa.manualTotalBilled
+                : invoiceTotals.totalBilled;
+
+            const totalReceived = loa.manualTotalReceived !== null && loa.manualTotalReceived !== undefined
+                ? loa.manualTotalReceived
+                : invoiceTotals.totalReceived;
+
+            const totalDeducted = loa.manualTotalDeducted !== null && loa.manualTotalDeducted !== undefined
+                ? loa.manualTotalDeducted
+                : invoiceTotals.totalDeducted;
+
+            // Calculate totalPending using LOA Value as baseline
+            // Formula: LOA Value (total receivables) - Received - Deducted
+            // This works for both bulk import (manual financials) and bills (calculated)
+            const totalPending = loa.loaValue - totalReceived - totalDeducted;
+
+            // Add calculated fields to LOA
+            const loaWithFinancials = {
+                ...loa,
+                totalReceivables: loa.loaValue, // Total receivables = LOA value
+                totalBilled,
+                totalReceived,
+                totalDeducted,
+                totalPending,
+            };
+
+            return ResultUtils.ok(loaWithFinancials);
+        } catch (error) {
+            console.error('LOA getLoaWithFinancials error:', error);
+            return ResultUtils.fail('Failed to retrieve LOA with financials');
+        }
+    }
+
+    /**
+     * Update the pending split (recoverable vs payment pending)
+     */
+    async updatePendingSplit(
+        id: string,
+        recoverablePending: number,
+        paymentPending: number
+    ): Promise<Result<any>> {
+        try {
+            // Get LOA with financial totals
+            const loaResult = await this.getLoaWithFinancials(id);
+            if (!loaResult.isSuccess || !loaResult.data) {
+                return ResultUtils.fail('LOA not found');
+            }
+
+            const loa = loaResult.data;
+            const totalPending = loa.totalPending || 0;
+
+            // Validate the split
+            const validation = this.financialService.validatePendingSplit(
+                totalPending,
+                recoverablePending,
+                paymentPending
+            );
+
+            if (!validation.valid) {
+                return ResultUtils.fail(validation.error || 'Invalid pending split');
+            }
+
+            // Update LOA with new pending split
+            const updatedLoa = await this.repository.update(id, {
+                recoverablePending,
+                paymentPending,
+            });
+
+            return ResultUtils.ok(updatedLoa);
+        } catch (error) {
+            console.error('LOA updatePendingSplit error:', error);
+            return ResultUtils.fail('Failed to update pending split');
+        }
+    }
+
+    /**
+     * Update manual financial overrides for historical data entry
+     * Also updates recoverable pending split if provided
+     */
+    async updateManualFinancials(
+        id: string,
+        manualTotalBilled?: number,
+        manualTotalReceived?: number,
+        manualTotalDeducted?: number,
+        recoverablePending?: number
+    ): Promise<Result<any>> {
+        try {
+            const idValidation = this.validator.validateId(id);
+            if (!idValidation.isSuccess) {
+                return ResultUtils.fail('Invalid ID format');
+            }
+
+            const loa = await this.repository.findById(id);
+            if (!loa) {
+                return ResultUtils.fail('LOA not found');
+            }
+
+            // Validate that manual values are non-negative if provided
+            if (manualTotalBilled !== undefined && manualTotalBilled < 0) {
+                return ResultUtils.fail('Manual total billed cannot be negative');
+            }
+            if (manualTotalReceived !== undefined && manualTotalReceived < 0) {
+                return ResultUtils.fail('Manual total received cannot be negative');
+            }
+            if (manualTotalDeducted !== undefined && manualTotalDeducted < 0) {
+                return ResultUtils.fail('Manual total deducted cannot be negative');
+            }
+
+            // Calculate the new totalPending to validate recoverablePending
+            const invoiceTotals = await this.financialService.aggregateInvoiceTotals(id);
+
+            const totalBilled = manualTotalBilled !== undefined
+                ? manualTotalBilled
+                : (loa.manualTotalBilled ?? invoiceTotals.totalBilled);
+
+            const totalReceived = manualTotalReceived !== undefined
+                ? manualTotalReceived
+                : (loa.manualTotalReceived ?? invoiceTotals.totalReceived);
+
+            const totalDeducted = manualTotalDeducted !== undefined
+                ? manualTotalDeducted
+                : (loa.manualTotalDeducted ?? invoiceTotals.totalDeducted);
+
+            // Use LOA Value as baseline for pending calculation
+            const totalPending = loa.loaValue - totalReceived - totalDeducted;
+
+            // Validate recoverable pending if provided
+            if (recoverablePending !== undefined) {
+                if (recoverablePending < 0) {
+                    return ResultUtils.fail('Recoverable pending cannot be negative');
+                }
+                // Only validate if totalPending is positive (normal case)
+                if (totalPending > 0 && recoverablePending > totalPending) {
+                    return ResultUtils.fail(`Recoverable pending (${recoverablePending}) cannot exceed total pending (${totalPending})`);
+                }
+            }
+
+            // Calculate payment pending (allow negative for overpayment scenarios)
+            const finalRecoverablePending = recoverablePending !== undefined ? recoverablePending : loa.recoverablePending;
+            const paymentPending = totalPending - finalRecoverablePending;
+
+            // Update LOA with manual values and pending split
+            const updateData: any = {
+                manualTotalBilled: manualTotalBilled !== undefined ? manualTotalBilled : undefined,
+                manualTotalReceived: manualTotalReceived !== undefined ? manualTotalReceived : undefined,
+                manualTotalDeducted: manualTotalDeducted !== undefined ? manualTotalDeducted : undefined,
+            };
+
+            // Only update pending split if recoverablePending was provided
+            if (recoverablePending !== undefined) {
+                updateData.recoverablePending = recoverablePending;
+                updateData.paymentPending = paymentPending;
+            }
+
+            await this.repository.update(id, updateData);
+
+            // Return LOA with both manual and calculated financials
+            return await this.getLoaWithFinancials(id);
+        } catch (error) {
+            console.error('LOA updateManualFinancials error:', error);
+            return ResultUtils.fail('Failed to update manual financial overrides');
         }
     }
 }

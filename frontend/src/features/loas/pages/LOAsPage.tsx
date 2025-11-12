@@ -181,12 +181,6 @@ function EditLOA() {
     // Map invoice fields from the first invoice
     invoiceNumber: firstInvoice?.invoiceNumber || '',
     invoiceAmount: firstInvoice?.invoiceAmount || null,
-    // LOA-level financial fields
-    totalReceivables: loa.loaValue || null,
-    actualAmountReceived: loa.actualAmountReceived || null,
-    amountDeducted: loa.amountDeducted || null,
-    amountPending: loa.amountPending || null,
-    deductionReason: loa.deductionReason || '',
     billLinks: firstInvoice?.billLinks || '',
   };
 

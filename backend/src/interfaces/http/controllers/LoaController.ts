@@ -53,13 +53,11 @@ export class LoaController {
 
       // Parse amount values
       const emdAmount = req.body.emdAmount ? Number(req.body.emdAmount) : undefined;
-
-      // Parse invoice/billing amount values
-      const invoiceAmount = req.body.invoiceAmount ? Number(req.body.invoiceAmount) : undefined;
-      const totalReceivables = req.body.totalReceivables ? Number(req.body.totalReceivables) : undefined;
-      const actualAmountReceived = req.body.actualAmountReceived ? Number(req.body.actualAmountReceived) : undefined;
-      const amountDeducted = req.body.amountDeducted ? Number(req.body.amountDeducted) : undefined;
-      const amountPending = req.body.amountPending ? Number(req.body.amountPending) : undefined;
+      const recoverablePending = req.body.recoverablePending ? Number(req.body.recoverablePending) : undefined;
+      const paymentPending = req.body.paymentPending ? Number(req.body.paymentPending) : undefined;
+      const manualTotalBilled = req.body.manualTotalBilled ? Number(req.body.manualTotalBilled) : undefined;
+      const manualTotalReceived = req.body.manualTotalReceived ? Number(req.body.manualTotalReceived) : undefined;
+      const manualTotalDeducted = req.body.manualTotalDeducted ? Number(req.body.manualTotalDeducted) : undefined;
 
       const result = await this.service.createLoa({
         loaNumber: req.body.loaNumber,
@@ -88,15 +86,13 @@ export class LoaController {
         warrantyPeriodYears: req.body.warrantyPeriodYears ? Number(req.body.warrantyPeriodYears) : undefined,
         warrantyStartDate: req.body.warrantyStartDate,
         warrantyEndDate: req.body.warrantyEndDate,
-        // Billing/Invoice fields
-        invoiceNumber: req.body.invoiceNumber,
-        invoiceAmount,
-        totalReceivables,
-        actualAmountReceived,
-        amountDeducted,
-        amountPending,
-        deductionReason: req.body.deductionReason,
-        billLinks: req.body.billLinks,
+        // Pending breakdown fields
+        recoverablePending,
+        paymentPending,
+        // Manual override fields
+        manualTotalBilled,
+        manualTotalReceived,
+        manualTotalDeducted,
         remarks: req.body.remarks,
       });
 
@@ -179,13 +175,11 @@ export class LoaController {
 
       // Parse amount values if present
       const emdAmount = req.body.emdAmount ? Number(req.body.emdAmount) : undefined;
-
-      // Parse invoice/billing amount values
-      const invoiceAmount = req.body.invoiceAmount ? Number(req.body.invoiceAmount) : undefined;
-      const totalReceivables = req.body.totalReceivables ? Number(req.body.totalReceivables) : undefined;
-      const actualAmountReceived = req.body.actualAmountReceived ? Number(req.body.actualAmountReceived) : undefined;
-      const amountDeducted = req.body.amountDeducted ? Number(req.body.amountDeducted) : undefined;
-      const amountPending = req.body.amountPending ? Number(req.body.amountPending) : undefined;
+      const recoverablePending = req.body.recoverablePending ? Number(req.body.recoverablePending) : undefined;
+      const paymentPending = req.body.paymentPending ? Number(req.body.paymentPending) : undefined;
+      const manualTotalBilled = req.body.manualTotalBilled ? Number(req.body.manualTotalBilled) : undefined;
+      const manualTotalReceived = req.body.manualTotalReceived ? Number(req.body.manualTotalReceived) : undefined;
+      const manualTotalDeducted = req.body.manualTotalDeducted ? Number(req.body.manualTotalDeducted) : undefined;
 
       const result = await this.service.updateLoa(id, {
         loaNumber: req.body.loaNumber,
@@ -215,15 +209,13 @@ export class LoaController {
         warrantyPeriodYears: req.body.warrantyPeriodYears ? Number(req.body.warrantyPeriodYears) : undefined,
         warrantyStartDate: req.body.warrantyStartDate,
         warrantyEndDate: req.body.warrantyEndDate,
-        // Billing/Invoice fields
-        invoiceNumber: req.body.invoiceNumber,
-        invoiceAmount,
-        totalReceivables,
-        actualAmountReceived,
-        amountDeducted,
-        amountPending,
-        deductionReason: req.body.deductionReason,
-        billLinks: req.body.billLinks,
+        // Pending breakdown fields
+        recoverablePending,
+        paymentPending,
+        // Manual override fields
+        manualTotalBilled,
+        manualTotalReceived,
+        manualTotalDeducted,
         remarks: req.body.remarks,
       });
 
@@ -270,10 +262,10 @@ export class LoaController {
   getLoa = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const result = await this.service.getLoa(id);
+      const result = await this.service.getLoaWithFinancials(id);
 
       if (!result.isSuccess) {
-        const errorMessage = Array.isArray(result.error) 
+        const errorMessage = Array.isArray(result.error)
           ? result.error[0]?.message || 'LOA not found'
           : result.error || 'LOA not found';
         throw new AppError(errorMessage, 404);
@@ -558,6 +550,98 @@ export class LoaController {
       });
     } catch (error) {
       console.error('Bulk import error:', error);
+      next(error);
+    }
+  };
+
+  /**
+   * Get LOA with complete financial calculations
+   */
+  getLoaWithFinancials = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      const result = await this.service.getLoaWithFinancials(id);
+
+      if (!result.isSuccess) {
+        res.status(404).json({ message: result.error });
+        return;
+      }
+
+      res.json(result.data);
+    } catch (error) {
+      console.error('LoaController getLoaWithFinancials error:', error);
+      next(error);
+    }
+  };
+
+  /**
+   * Update pending split (recoverable vs payment pending)
+   */
+  updatePendingSplit = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      // Parse numeric values
+      const recoverablePending = req.body.recoverablePending !== undefined
+        ? Number(req.body.recoverablePending)
+        : 0;
+      const paymentPending = req.body.paymentPending !== undefined
+        ? Number(req.body.paymentPending)
+        : 0;
+
+      const result = await this.service.updatePendingSplit(
+        id,
+        recoverablePending,
+        paymentPending
+      );
+
+      if (!result.isSuccess) {
+        res.status(400).json({ message: result.error });
+        return;
+      }
+
+      res.json(result.data);
+    } catch (error) {
+      console.error('LoaController updatePendingSplit error:', error);
+      next(error);
+    }
+  };
+
+  updateManualFinancials = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      // Parse numeric values
+      const manualTotalBilled = req.body.manualTotalBilled !== undefined
+        ? Number(req.body.manualTotalBilled)
+        : undefined;
+      const manualTotalReceived = req.body.manualTotalReceived !== undefined
+        ? Number(req.body.manualTotalReceived)
+        : undefined;
+      const manualTotalDeducted = req.body.manualTotalDeducted !== undefined
+        ? Number(req.body.manualTotalDeducted)
+        : undefined;
+      const recoverablePending = req.body.recoverablePending !== undefined
+        ? Number(req.body.recoverablePending)
+        : undefined;
+
+      const result = await this.service.updateManualFinancials(
+        id,
+        manualTotalBilled,
+        manualTotalReceived,
+        manualTotalDeducted,
+        recoverablePending
+      );
+
+      if (!result.isSuccess) {
+        res.status(400).json({ message: result.error });
+        return;
+      }
+
+      res.json(result.data);
+    } catch (error) {
+      console.error('LoaController updateManualFinancials error:', error);
       next(error);
     }
   };

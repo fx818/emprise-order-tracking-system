@@ -88,19 +88,19 @@ model Site {
 }
 
 model LOA {
-  id                     String          @id @default(uuid())
-  loaNumber              String          @unique
+  id                     String            @id @default(uuid())
+  loaNumber              String            @unique
   loaValue               Float
   siteId                 String?
   deliveryPeriod         Json
   workDescription        String
   documentUrl            String
   tags                   String[]
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
   emdAmount              Float?
-  hasEmd                 Boolean         @default(false)
-  status                 LOAStatus       @default(NOT_STARTED)
+  hasEmd                 Boolean           @default(false)
+  status                 LOAStatus         @default(NOT_STARTED)
   dueDate                DateTime?
   warrantyPeriodMonths   Int?
   warrantyPeriodYears    Int?
@@ -115,25 +115,25 @@ model LOA {
   fdBgDetails            String?
   daysToDueDateFromExcel Int?
   tenderId               String?
-  hasSd                  Boolean         @default(false)
-  sdFdrId                String?         @unique
-  hasPg                  Boolean         @default(false)
-  pgFdrId                String?         @unique
-  receivablePending      Float?
-  actualAmountReceived   Float?
-  amountDeducted         Float?
-  amountPending          Float?
-  deductionReason        String?
+  hasSd                  Boolean           @default(false)
+  sdFdrId                String?           @unique
+  hasPg                  Boolean           @default(false)
+  pgFdrId                String?           @unique
+  recoverablePending     Float             @default(0)
+  paymentPending         Float             @default(0)
+  manualTotalBilled      Float?
+  manualTotalReceived    Float?
+  manualTotalDeducted    Float?
   amendments             Amendment[]
   invoices               Invoice[]
   otherDocuments         OtherDocument[]
-  site                   Site?              @relation(fields: [siteId], references: [id])
-  tender                 Tender?            @relation(fields: [tenderId], references: [id], onDelete: Restrict)
-  poc                    POC?               @relation(fields: [pocId], references: [id])
-  inspectionAgency       InspectionAgency?  @relation(fields: [inspectionAgencyId], references: [id])
+  site                   Site?             @relation(fields: [siteId], references: [id])
+  tender                 Tender?           @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  poc                    POC?              @relation(fields: [pocId], references: [id])
+  inspectionAgency       InspectionAgency? @relation(fields: [inspectionAgencyId], references: [id])
   purchaseOrders         PurchaseOrder[]
-  sdFdr                  FDR?            @relation("LOASecurityDeposit", fields: [sdFdrId], references: [id])
-  pgFdr                  FDR?            @relation("LOAPerformanceGuarantee", fields: [pgFdrId], references: [id])
+  sdFdr                  FDR?              @relation("LOASecurityDeposit", fields: [sdFdrId], references: [id])
+  pgFdr                  FDR?              @relation("LOAPerformanceGuarantee", fields: [pgFdrId], references: [id])
 
   @@index([siteId])
   @@index([dueDate])
@@ -271,28 +271,28 @@ model Customer {
 }
 
 model Tender {
-  id                 String           @id @default(uuid())
-  tenderNumber       String           @unique
-  dueDate            DateTime
-  description        String
-  hasEMD             Boolean          @default(false)
-  emdAmount          Float?
-  emdBankName        String?
-  emdSubmissionDate  DateTime?
-  emdMaturityDate    DateTime?
-  emdDocumentUrl     String?
-  emdReleaseStatus   EMDReturnStatus?
-  emdReleaseDate     DateTime?
-  emdReleaseAmount   Float?
-  documentUrl        String?
-  tags               String[]
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  nitDocumentUrl     String?
-  status             TenderStatus     @default(ACTIVE)
-  siteId             String?
-  loas               LOA[]
-  site               Site?            @relation(fields: [siteId], references: [id])
+  id                String           @id @default(uuid())
+  tenderNumber      String           @unique
+  dueDate           DateTime
+  description       String
+  hasEMD            Boolean          @default(false)
+  emdAmount         Float?
+  emdBankName       String?
+  emdSubmissionDate DateTime?
+  emdMaturityDate   DateTime?
+  emdDocumentUrl    String?
+  emdReleaseStatus  EMDReturnStatus?
+  emdReleaseDate    DateTime?
+  emdReleaseAmount  Float?
+  documentUrl       String?
+  tags              String[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  nitDocumentUrl    String?
+  status            TenderStatus     @default(ACTIVE)
+  siteId            String?
+  loas              LOA[]
+  site              Site?            @relation(fields: [siteId], references: [id])
 
   @@index([siteId])
 }
@@ -327,17 +327,20 @@ model InspectionAgency {
 }
 
 model Invoice {
-  id            String     @id @default(uuid())
-  loaId         String
-  invoiceNumber String?
-  invoiceAmount Float?
-  billLinks     String?
-  remarks       String?
-  status        BillStatus @default(REGISTERED)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  invoicePdfUrl String?
-  loa           LOA        @relation(fields: [loaId], references: [id], onDelete: Cascade)
+  id              String     @id @default(uuid())
+  loaId           String
+  invoiceNumber   String?
+  invoiceAmount   Float?
+  amountReceived  Float      @default(0)
+  amountDeducted  Float      @default(0)
+  deductionReason String?
+  billLinks       String?
+  remarks         String?
+  status          BillStatus @default(REGISTERED)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  invoicePdfUrl   String?
+  loa             LOA        @relation(fields: [loaId], references: [id], onDelete: Cascade)
 
   @@index([loaId])
 }

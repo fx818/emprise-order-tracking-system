@@ -3,6 +3,9 @@ import { BillStatus } from '../../../domain/entities/Bill';
 export interface UpdateBillDto {
   invoiceNumber?: string;
   invoiceAmount?: number;
+  amountReceived?: number;
+  amountDeducted?: number;
+  deductionReason?: string;
   billLinks?: string;
   remarks?: string;
   status?: BillStatus;

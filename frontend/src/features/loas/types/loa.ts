@@ -33,12 +33,9 @@ export const loaSchema = z.object({
   sdFdrId: z.string().optional().nullable(),
   hasPg: z.boolean().default(false),
   pgFdrId: z.string().optional().nullable(),
-  receivablePending: z.number().optional().nullable(),
-  // LOA-level billing fields (total across all bills)
-  actualAmountReceived: z.number().optional().nullable(),
-  amountDeducted: z.number().optional().nullable(),
-  amountPending: z.number().optional().nullable(),
-  deductionReason: z.string().optional(),
+  // Pending breakdown fields (LOA-level)
+  recoverablePending: z.number().optional().nullable(),
+  paymentPending: z.number().optional().nullable(),
   // Warranty period fields
   warrantyPeriodMonths: z.number().min(0).optional().nullable(),
   warrantyPeriodYears: z.number().min(0).optional().nullable(),
@@ -99,10 +96,19 @@ export interface LOA extends Omit<LOAFormData, 'documentFile' | 'invoicePdfFile'
   documentUrl?: string;
   sdFdr?: FDRSummary;
   pgFdr?: FDRSummary;
-  actualAmountReceived?: number | null;
-  amountDeducted?: number | null;
-  amountPending?: number | null;
-  deductionReason?: string;
+  // Pending breakdown (LOA-level)
+  recoverablePending: number;
+  paymentPending: number;
+  // Manual override fields (for historical data entry)
+  manualTotalBilled?: number;
+  manualTotalReceived?: number;
+  manualTotalDeducted?: number;
+  // Calculated financial fields (from invoices)
+  totalReceivables?: number; // = loaValue
+  totalBilled?: number;
+  totalReceived?: number;
+  totalDeducted?: number;
+  totalPending?: number;
   amendments: Amendment[];
   otherDocuments?: OtherDocument[];
   purchaseOrders: PurchaseOrder[];
@@ -139,12 +145,25 @@ export interface Invoice {
   loaId: string;
   invoiceNumber?: string;
   invoiceAmount?: number;
+  amountReceived: number;
+  amountDeducted: number;
+  amountPending: number; // Calculated field
+  deductionReason?: string;
   billLinks?: string;
   invoicePdfUrl?: string;
   remarks?: string;
   status: BillStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+// Helper to calculate invoice pending
+// Note: Can return negative values for overpayment scenarios
+export function calculateInvoicePending(invoice: Partial<Invoice>): number {
+  const invoiceAmount = invoice.invoiceAmount || 0;
+  const amountReceived = invoice.amountReceived || 0;
+  const amountDeducted = invoice.amountDeducted || 0;
+  return invoiceAmount - amountReceived - amountDeducted;
 }
 
 // Interface for Amendment with additional properties

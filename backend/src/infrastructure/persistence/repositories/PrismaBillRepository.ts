@@ -11,6 +11,9 @@ export class PrismaBillRepository {
     loaId: string;
     invoiceNumber?: string;
     invoiceAmount?: number;
+    amountReceived?: number;
+    amountDeducted?: number;
+    deductionReason?: string;
     billLinks?: string;
     remarks?: string;
     status?: BillStatus;
@@ -22,6 +25,9 @@ export class PrismaBillRepository {
           loaId: data.loaId,
           invoiceNumber: data.invoiceNumber,
           invoiceAmount: data.invoiceAmount,
+          amountReceived: data.amountReceived || 0,
+          amountDeducted: data.amountDeducted || 0,
+          deductionReason: data.deductionReason,
           billLinks: data.billLinks,
           remarks: data.remarks,
           status: data.status || 'REGISTERED',
@@ -74,6 +80,9 @@ export class PrismaBillRepository {
     data: {
       invoiceNumber?: string;
       invoiceAmount?: number;
+      amountReceived?: number;
+      amountDeducted?: number;
+      deductionReason?: string;
       billLinks?: string;
       remarks?: string;
       status?: BillStatus;
@@ -86,6 +95,9 @@ export class PrismaBillRepository {
         data: {
           invoiceNumber: data.invoiceNumber,
           invoiceAmount: data.invoiceAmount,
+          amountReceived: data.amountReceived,
+          amountDeducted: data.amountDeducted,
+          deductionReason: data.deductionReason,
           billLinks: data.billLinks,
           remarks: data.remarks,
           status: data.status,
@@ -124,6 +136,36 @@ export class PrismaBillRepository {
       return count > 0;
     } catch (error) {
       console.error('PrismaBillRepository exists error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Aggregate invoice totals for an LOA
+   * Returns totals for: billed, received, deducted
+   */
+  async aggregateTotalsByLoa(loaId: string): Promise<{
+    totalBilled: number;
+    totalReceived: number;
+    totalDeducted: number;
+  }> {
+    try {
+      const result = await this.prisma.invoice.aggregate({
+        where: { loaId },
+        _sum: {
+          invoiceAmount: true,
+          amountReceived: true,
+          amountDeducted: true,
+        },
+      });
+
+      return {
+        totalBilled: result._sum.invoiceAmount || 0,
+        totalReceived: result._sum.amountReceived || 0,
+        totalDeducted: result._sum.amountDeducted || 0,
+      };
+    } catch (error) {
+      console.error('PrismaBillRepository aggregateTotalsByLoa error:', error);
       throw error;
     }
   }

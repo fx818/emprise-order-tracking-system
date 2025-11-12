@@ -27,20 +27,16 @@ export interface CreateLoaDto {
     sdFdrId?: string;
     hasPg?: boolean;
     pgFdrId?: string;
-    receivablePending?: number;
+    // Pending breakdown fields
+    recoverablePending?: number;
+    paymentPending?: number;
+    // Manual override fields (for historical data entry)
+    manualTotalBilled?: number;
+    manualTotalReceived?: number;
+    manualTotalDeducted?: number;
     // Warranty fields
     warrantyPeriodMonths?: number;
     warrantyPeriodYears?: number;
     warrantyStartDate?: string;
     warrantyEndDate?: string;
-    // Billing/Invoice fields
-    invoiceNumber?: string;
-    invoiceAmount?: number;
-    totalReceivables?: number;
-    actualAmountReceived?: number;
-    amountDeducted?: number;
-    amountPending?: number;
-    deductionReason?: string;
-    billLinks?: string;
-    invoicePdfFile?: Express.Multer.File;
 }

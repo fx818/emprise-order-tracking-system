@@ -5,7 +5,7 @@ export const itemSchema = z.object({
   name: z.string().min(1, 'Item name is required'),
   description: z.string().optional(),
   uom: z.string().min(1, 'Unit of measurement is required'),
-  hsnCode: z.string().min(1, 'HSN code is required'),
+  hsnCode: z.string().optional().or(z.literal('')),
 });
 
 export type ItemFormData = z.infer<typeof itemSchema>;

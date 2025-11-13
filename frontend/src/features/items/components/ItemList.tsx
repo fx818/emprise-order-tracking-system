@@ -144,7 +144,7 @@ export function ItemList() {
         searchTerm === "" ||
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.hsnCode.toLowerCase().includes(searchTerm.toLowerCase());
+        item.hsnCode?.toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchesSearch;
     });

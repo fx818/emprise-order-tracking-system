@@ -22,14 +22,14 @@ export function useOffers() {
       if (!getCurrentUser) {
         throw new Error('User not found');
       }
-      
+      console.log("the data is", data);
       const apiData = {
         ...data,
         status: 'DRAFT'
       };
       
       const response = await apiClient.post('/budgetary-offers', apiData);
-
+      console.log("the response is", response);
       showSuccess('Budgetary offer created successfully');
       return response.data;
     } catch (error: any) {

@@ -7,7 +7,10 @@ import {
   FileText,
   AlertTriangle,
   Upload,
+  RefreshCw,
+  XCircle,
 } from "lucide-react";
+
 import { Button } from "../../../components/ui/button";
 import {
   Select,
@@ -41,7 +44,13 @@ import {
   PaginationEllipsis,
 } from "../../../components/ui/pagination";
 import { BulkImportFDR } from "./BulkImportFDR";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../../../components/ui/dialog";
 
 const statusOptions = [
   { label: "All Status", value: "all" },
@@ -72,23 +81,39 @@ export function FDRList() {
   const [maturityFilter, setMaturityFilter] = useState("all");
   const [fdrs, setFDRs] = useState<FDR[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
+  /**
+   * Fetch FDRs from API with full error handling
+   */
   const fetchFDRs = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      // Request all FDRs by setting a high limit for client-side pagination
       const response = await apiClient.get("/fdrs", {
         params: {
-          limit: 10000, // High limit to get all FDRs for client-side pagination
+          limit: 10000,
           page: 1,
         },
       });
-      setFDRs(response.data.data.data);
-    } catch (error) {
-      console.error("Failed to fetch FDRs:", error);
+
+      const data = response?.data?.data?.data;
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid response format received from server");
+      }
+
+      setFDRs(data);
+    } catch (err: any) {
+      console.error("Failed to fetch FDRs:", err);
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Unable to load FDR records. Please try again later.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -98,7 +123,10 @@ export function FDRList() {
     fetchFDRs();
   }, []);
 
-  const columns = [
+  /**
+   * Define columns for the data table
+   */
+  const columns: Column<FDR>[] = [
     {
       header: "S.No.",
       accessor: (_row: FDR, index?: number) => {
@@ -112,20 +140,11 @@ export function FDRList() {
         <span className="font-medium">{row.category}</span>
       ),
     },
+    { header: "Bank Name", accessor: "bankName" },
+    { header: "FDR Number", accessor: (row: FDR) => row.fdrNumber || "-" },
+    { header: "Account Name", accessor: (row: FDR) => row.accountName || "-" },
     {
-      header: "Bank Name",
-      accessor: "bankName",
-    },
-    {
-      header: "FDR Number",
-      accessor: (row: FDR) => row.fdrNumber || "-",
-    },
-    {
-      header: "Account Name",
-      accessor: (row: FDR) => row.accountName || "-",
-    },
-    {
-      header: ({ sortable }: { sortable: boolean }) => (
+      header: ({ sortable }) => (
         <div className="flex items-center">
           Deposit Amount
           {sortable && (
@@ -161,55 +180,51 @@ export function FDRList() {
         );
       },
     },
-    {
-      header: "POC",
-      accessor: (row: FDR) => row.poc || "-",
-    },
-    {
-      header: "Location",
-      accessor: (row: FDR) => row.location || "-",
-    },
+    { header: "POC", accessor: (row: FDR) => row.poc || "-" },
+    { header: "Location", accessor: (row: FDR) => row.location || "-" },
     {
       header: "Status",
-      accessor: (row: FDR) => (
-        <StatusBadge status={row.status} />
-      ),
+      accessor: (row: FDR) => <StatusBadge status={row.status} />,
     },
     {
       header: "Actions",
       accessor: (row: FDR) => (
-        <div className="flex">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate(`/fdrs/${row.id}`)}>
-                <FileText className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate(`/fdrs/${row.id}`)}>
+              <FileText className="mr-2 h-4 w-4" />
+              View Details
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];
 
-  // Filter FDRs based on search term, status, category, and maturity
+  /**
+   * Filter FDRs based on filters
+   */
   const filteredFDRs = Array.isArray(fdrs)
     ? fdrs.filter((fdr) => {
         const matchesSearch =
           searchTerm === "" ||
           fdr.bankName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (fdr.fdrNumber && fdr.fdrNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (fdr.location && fdr.location.toLowerCase().includes(searchTerm.toLowerCase()));
+          (fdr.fdrNumber &&
+            fdr.fdrNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (fdr.location &&
+            fdr.location.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        const matchesStatus = statusFilter === "all" || fdr.status === statusFilter;
-        const matchesCategory = categoryFilter === "all" || fdr.category === categoryFilter;
+        const matchesStatus =
+          statusFilter === "all" || fdr.status === statusFilter;
+        const matchesCategory =
+          categoryFilter === "all" || fdr.category === categoryFilter;
 
         const matchesMaturity = () => {
           if (maturityFilter === "all") return true;
@@ -225,70 +240,72 @@ export function FDRList() {
       })
     : [];
 
-  // Calculate pagination values
+  // Pagination calculations
   const totalItems = filteredFDRs.length;
   const totalPages = Math.ceil(totalItems / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const currentItems = filteredFDRs.slice(startIndex, endIndex);
 
-  // Handle page changes
+  // Pagination handler
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
+  // Bulk import success handler
   const handleBulkImportSuccess = () => {
     setBulkImportOpen(false);
-    fetchFDRs(); // Refresh the list
+    fetchFDRs();
   };
 
   return (
     <div className="space-y-6">
-      {/* Filter Section */}
+      {/* Filters */}
       <Card className="p-4">
         <div className="grid gap-3 md:grid-cols-4">
-          <div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categoryOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Select value={maturityFilter} onValueChange={setMaturityFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by maturity" />
-              </SelectTrigger>
-              <SelectContent>
-                {maturityOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Category Filter */}
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categoryOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Maturity Filter */}
+          <Select value={maturityFilter} onValueChange={setMaturityFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by maturity" />
+            </SelectTrigger>
+            <SelectContent>
+              {maturityOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Actions */}
           <div className="flex justify-end gap-2">
             <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
               <DialogTrigger asChild>
@@ -304,6 +321,7 @@ export function FDRList() {
                 <BulkImportFDR onSuccess={handleBulkImportSuccess} />
               </DialogContent>
             </Dialog>
+
             <Button onClick={() => navigate("/fdrs/new")}>
               Create New FDR
             </Button>
@@ -311,121 +329,113 @@ export function FDRList() {
         </div>
       </Card>
 
-      {/* Expiring FDRs Alert */}
+      {/* Expiry Notifications */}
       <ExpiryNotification fdrs={fdrs} />
 
-      {/* FDRs Table */}
-      {loading ? (
-        <LoadingSpinner />
-      ) : (
+      {/* Error State */}
+      {error && (
+        <div className="p-4 rounded-md bg-red-50 border border-red-200 text-red-600 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <XCircle className="h-5 w-5 text-red-500" />
+            <span>{error}</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchFDRs}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <LoadingSpinner />
+        </div>
+      )}
+
+      {/* FDR Table */}
+      {!loading && !error && (
         <div className="space-y-4">
-          {/* Results Info */}
-          {totalItems > 0 && (
-            <div className="text-sm text-muted-foreground">
-              Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems} FDR{totalItems !== 1 ? 's' : ''}
+          {totalItems > 0 ? (
+            <>
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of{" "}
+                {totalItems} FDR{totalItems !== 1 ? "s" : ""}
+              </div>
+
+              <DataTable
+                columns={columns}
+                data={currentItems}
+                onRowClick={(row) => navigate(`/fdrs/${row.id}`)}
+              />
+
+              {totalItems > pageSize && (
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage > 1)
+                            handlePageChange(currentPage - 1);
+                        }}
+                      />
+                    </PaginationItem>
+
+                    {[...Array(totalPages)].map((_, idx) => {
+                      const page = idx + 1;
+                      if (
+                        page === 1 ||
+                        page === totalPages ||
+                        Math.abs(currentPage - page) <= 1
+                      ) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handlePageChange(page);
+                              }}
+                              isActive={page === currentPage}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      }
+                      if (
+                        page === 2 ||
+                        page === totalPages - 1
+                      ) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        );
+                      }
+                      return null;
+                    })}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage < totalPages)
+                            handlePageChange(currentPage + 1);
+                        }}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </>
+          ) : (
+            <div className="p-6 text-center text-gray-500 border rounded-md">
+              No FDR records found matching your filters.
             </div>
-          )}
-
-          <DataTable
-            columns={columns as Column<FDR>[]}
-            data={currentItems}
-            loading={loading}
-            onRowClick={(row) => navigate(`/fdrs/${row.id}`)}
-          />
-
-          {/* Pagination */}
-          {totalItems > pageSize && (
-            <Pagination>
-              <PaginationContent>
-                {/* Previous Button */}
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (currentPage > 1) handlePageChange(currentPage - 1);
-                    }}
-                  />
-                </PaginationItem>
-
-                {/* First Page */}
-                <PaginationItem>
-                  <PaginationLink
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handlePageChange(1);
-                    }}
-                    isActive={currentPage === 1}
-                  >
-                    1
-                  </PaginationLink>
-                </PaginationItem>
-
-                {/* Ellipsis after first page */}
-                {currentPage > 3 && (
-                  <PaginationItem>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                )}
-
-                {/* Pages around current page */}
-                {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-                  const pageNumber = currentPage - 1 + i;
-                  if (pageNumber > 1 && pageNumber < totalPages) {
-                    return (
-                      <PaginationItem key={pageNumber}>
-                        <PaginationLink
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handlePageChange(pageNumber);
-                          }}
-                          isActive={currentPage === pageNumber}
-                        >
-                          {pageNumber}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  }
-                  return null;
-                })}
-
-                {/* Ellipsis before last page */}
-                {currentPage < totalPages - 2 && (
-                  <PaginationItem>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                )}
-
-                {/* Last Page */}
-                {totalPages > 1 && (
-                  <PaginationItem>
-                    <PaginationLink
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(totalPages);
-                      }}
-                      isActive={currentPage === totalPages}
-                    >
-                      {totalPages}
-                    </PaginationLink>
-                  </PaginationItem>
-                )}
-
-                {/* Next Button */}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (currentPage < totalPages) handlePageChange(currentPage + 1);
-                    }}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
           )}
         </div>
       )}

@@ -158,10 +158,14 @@ export function SiteForm({ mode }: SiteFormProps) {
       });
       navigate("/sites");
     } catch (error) {
-      console.error("Form submission error:", error);
+      console.log("here:::", error);
+      const errMsg =
+        (error as any)?.response?.data?.message ??
+        (error instanceof Error ? error.message : String(error));
+      console.error("Form submission error:", errMsg);
       toast({
         title: "Error",
-        description: `Failed to ${mode === "create" ? "create" : "update"} site`,
+        description: `Failed to ${mode === "create" ? "create" : "update"} site. ${errMsg ? errMsg : ""}`,
         variant: "destructive",
       });
     } finally {

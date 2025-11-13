@@ -14,18 +14,17 @@ export function CreateTenderPage() {
   const handleSubmit = async (tenderData: TenderFormData) => {
     setIsSubmitting(true);
     try {
-      // Create tender with embedded EMD data
-      await createTender(tenderData);
-
+      await createTender(tenderData); // handles toasts internally
       navigate('/tenders');
     } catch (error) {
-      console.error('Failed to create tender', error);
-      // Re-throw the error so TenderForm can handle it
-      throw error;
+      console.error('Failed to create tender:', error);
+      // Optional: fallback toast if useTenders doesn’t handle it
+      // showError(error.response?.data?.message || "Failed to create tender.");
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <>

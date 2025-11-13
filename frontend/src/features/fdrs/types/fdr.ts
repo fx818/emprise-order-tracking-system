@@ -16,7 +16,7 @@ export const fdrSchema = z.object({
   location: z.string().optional(),
   status: z.enum(['RUNNING', 'COMPLETED', 'CANCELLED', 'RETURNED']).optional(),
   offerId: z.string().optional(),
-  tags: z.array(z.string()).default(['FD']),
+  tags: z.array(z.string()).optional(),
   documentFile: z.any().optional() // We'll handle file validation separately
 });
 

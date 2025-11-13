@@ -16,12 +16,38 @@ import { Textarea } from "../../../components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import type { Item } from "../types/item";
 
+// const itemSchema = z.object({
+//   name: z.string().min(1, "Name is required"),
+//   description: z.string().min(1, "Description is required"),
+//   uom: z.string().min(1, "Unit of measurement is required"),
+//   hsnCode: z.string().min(1, "HSN Code is required"),
+// });
+
+
 const itemSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().min(1, "Description is required"),
+  name: z
+    .string()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must be at most 100 characters"),
+
+  description: z
+    .string()
+    .min(10, "Description must be at least 10 characters")
+    .max(500, "Description must be at most 500 characters")
+    .optional()
+    .or(z.literal("")), // if description is optional UI wise
+
   uom: z.string().min(1, "Unit of measurement is required"),
-  hsnCode: z.string().min(1, "HSN Code is required"),
+
+  hsnCode: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^[0-9]{4,8}$/.test(val),
+      "HSN Code must be 4–8 digits"
+    ),
 });
+
 
 type ItemFormData = z.infer<typeof itemSchema>;
 

@@ -62,6 +62,7 @@ const formatCurrency = (value: number): string => {
 
 export function OfferForm({ initialData, onSubmit, onCancel }: OfferFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   // const { loading } = useOffers();
   const [selectedTags, setSelectedTags] = useState<string[]>(initialData?.tags || []);
   const [tagInput, setTagInput] = useState('');
@@ -82,8 +83,10 @@ export function OfferForm({ initialData, onSubmit, onCancel }: OfferFormProps) {
         const response = await apiClient.get('/users');
         const adminUsers = response.data.filter((user: User) => user.role === 'ADMIN');
         setApprovers(adminUsers);
+        setFormError(null);
       } catch (error) {
         console.error('Failed to fetch approvers:', error);
+        setFormError(typeof error === 'string' ? error : (error instanceof Error ? error.message : 'Failed to fetch approvers'));
       }
     };
     fetchApprovers();
@@ -94,8 +97,10 @@ export function OfferForm({ initialData, onSubmit, onCancel }: OfferFormProps) {
       try {
         const data = await getCustomers();
         setCustomers(data);
+        setFormError(null);
       } catch (error) {
         console.error('Failed to fetch customers:', error);
+        setFormError(typeof error === 'string' ? error : (error instanceof Error ? error.message : 'Failed to fetch customers'));
       }
     };
     fetchCustomers();
@@ -127,16 +132,36 @@ export function OfferForm({ initialData, onSubmit, onCancel }: OfferFormProps) {
     control: form.control,
     name: "workItems",
   });
+const handleSubmit = async (data: OfferFormData) => {
+  try {
+    setFormError(null);
+    setIsSubmitting(true);
+    console.log('Submitting form data:', data);
+    await onSubmit(data);
+  } catch (error: any) {
+    console.error('Error submitting offer:', error);
 
-  const handleSubmit = async (data: OfferFormData) => {
-    try {
-      setIsSubmitting(true);
-      console.log('Submitting form data:', data);
-      await onSubmit(data);
-    } finally {
-      setIsSubmitting(false);
+    const backendError = error?.response?.data || {};
+
+    // Field-level server validation errors
+    if (Array.isArray(backendError.errors)) {
+      backendError.errors.forEach((err: any) => {
+        if (err.field && err.message) {
+          form.setError(err.field as any, { type: 'server', message: err.message });
+        }
+      });
+    } else {
+      // Form-level (non-field) error
+      const message =
+        backendError.message ||
+        (typeof error === 'string' ? error : error?.message) ||
+        'Failed to save offer.';
+      setFormError(message);
     }
-  };
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleAddTag = (tag: string) => {
     if (tag && !selectedTags.includes(tag)) {
@@ -163,6 +188,11 @@ export function OfferForm({ initialData, onSubmit, onCancel }: OfferFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        {formError && (
+          <div className="mb-4 rounded-md bg-red-50 p-3 border border-red-100 text-red-800">
+            {formError}
+          </div>
+        )}
         {/* Offer Date */}
         <FormField
           control={form.control}

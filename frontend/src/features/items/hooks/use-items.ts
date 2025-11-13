@@ -41,6 +41,40 @@ export function useItems() {
     }
   }, [showError]);
 
+  // const createItem = useCallback(async (data: ItemFormData) => {
+  //   try {
+  //     const response = await apiClient.post('/items', {
+  //       ...data,
+  //       unitPrice: 0,
+  //     });
+
+  //     return response.data.data;
+
+  //   } catch (error: any) {
+  //     console.error("Create Item Error:", error);
+
+  //     const res = error?.response?.data;
+
+  //     // If backend sent validation errors (array)
+  //     if (Array.isArray(res?.error) && res.error.length > 0) {
+  //       const firstMsg = res.error[0].message;
+  //       showError(firstMsg);
+  //       throw error;
+  //     }
+
+  //     // If backend sent a simple message
+  //     if (res?.message) {
+  //       showError(res.message);
+  //       throw error;
+  //     }
+
+  //     // Fallback
+  //     showError("Failed to create item");
+  //     throw error;
+  //   }
+  // }, [showError]);
+
+
   const updateItem = useCallback(async (id: string, data: ItemFormData) => {
     try {
       const response = await apiClient.put(`/items/${id}`, {
@@ -57,7 +91,6 @@ export function useItems() {
   const deleteItem = useCallback(async (id: string) => {
     try {
       setLoading(true);
-      
       await apiClient.delete(`/items/${id}`);
       // If the delete request doesn't throw an error, consider it successful
       showSuccess('Item deleted successfully');

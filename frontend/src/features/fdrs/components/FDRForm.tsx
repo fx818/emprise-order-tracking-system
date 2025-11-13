@@ -1,160 +1,206 @@
-import { useForm } from '../../../hooks/use-form';
-import { useState } from 'react';
+"use client";
+
+import { useForm } from "../../../hooks/use-form";
+import { useState } from "react";
 import { Button } from "../../../components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../../../components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "../../../components/ui/form";
 import { Input } from "../../../components/ui/input";
 import { Textarea } from "../../../components/ui/textarea";
 import { Calendar } from "../../../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../../../components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../../../components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
 import { Alert, AlertDescription } from "../../../components/ui/alert";
-import { fdrSchema, type FDRFormData } from '../types/fdr';
-import { cn } from '../../../lib/utils';
-import { format } from 'date-fns';
-import { LoadingSpinner } from '../../../components/feedback/LoadingSpinner';
-import { extractFDRData } from './fdr-extracter';
-import { parseISO } from 'date-fns';
+import { fdrSchema, type FDRFormData } from "../types/fdr";
+import { cn } from "../../../lib/utils";
+import { format, parseISO } from "date-fns";
+import { LoadingSpinner } from "../../../components/feedback/LoadingSpinner";
+import { extractFDRData } from "./fdr-extracter";
 import { X, Loader2 } from "lucide-react";
 import { Badge } from "../../../components/ui/badge";
 
 interface FDRFormProps {
   initialData?: Partial<FDRFormData>;
-  onSubmit: (data: FDRFormData) => void;
+  onSubmit: (data: FDRFormData) => Promise<void>;
   onCancel: () => void;
 }
 
 export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
   const [extracting, setExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [newTag, setNewTag] = useState('');
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [newTag, setNewTag] = useState("");
+  const [fileName, setFileName] = useState<string | null>(null);
 
   const form = useForm<FDRFormData>({
     schema: fdrSchema,
     defaultValues: {
-      category: initialData?.category || 'FD',
-      bankName: initialData?.bankName || 'IDBI',
-      accountNo: initialData?.accountNo || '',
-      fdrNumber: initialData?.fdrNumber || '',
-      accountName: initialData?.accountName || '',
+      category: initialData?.category || "FD",
+      bankName: initialData?.bankName || "IDBI",
+      accountNo: initialData?.accountNo || "",
+      fdrNumber: initialData?.fdrNumber || "",
+      accountName: initialData?.accountName || "",
       depositAmount: initialData?.depositAmount || 0,
       dateOfDeposit: initialData?.dateOfDeposit || new Date(),
       maturityValue: initialData?.maturityValue,
       maturityDate: initialData?.maturityDate,
-      contractNo: initialData?.contractNo || '',
-      contractDetails: initialData?.contractDetails || '',
-      poc: initialData?.poc || '',
-      location: initialData?.location || '',
+      contractNo: initialData?.contractNo || "",
+      contractDetails: initialData?.contractDetails || "",
+      poc: initialData?.poc || "",
+      location: initialData?.location || "",
       status: initialData?.status,
-      tags: initialData?.tags || ['FD'],
+      tags: initialData?.tags || [],
     },
   });
 
-  const handleSubmit = async (data: FDRFormData) => {
-    await onSubmit(data);
-  };
-
   const parseDateString = (dateStr: string | null): Date | null => {
     if (!dateStr) return null;
-
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const year = parseInt(parts[2], 10);
-      return new Date(year, month, day);
-    }
-
     try {
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+        const [day, month, year] = parts.map(Number);
+        return new Date(year, month - 1, day);
+      }
       return parseISO(dateStr);
     } catch {
       return null;
     }
   };
 
+  // ------------------ FILE UPLOAD + EXTRACTION -------------------
   const handleFileUpload = async (file: File) => {
     try {
+      // 1️⃣ Validate file
+      if (!file) throw new Error("No file selected.");
+      if (!["image/jpeg", "image/png", "application/pdf"].includes(file.type)) {
+        throw new Error("Invalid file format. Please upload JPG, PNG, or PDF.");
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error("File too large. Please upload files smaller than 10MB.");
+      }
+
       setExtracting(true);
+      setFileName(file.name);
       setExtractionError(null);
 
+      // 2️⃣ Try extracting FDR details
       const extractedData = await extractFDRData(file);
+      if (!extractedData) {
+        throw new Error("Failed to extract data from file. Please check file clarity.");
+      }
 
-      const updates: Partial<FDRFormData> = { bankName: 'IDBI' };
+      // 3️⃣ Update form with extracted data
+      const updates: Partial<FDRFormData> = { bankName: "IDBI" };
 
-      if (extractedData.depositAmount) {
+      if (extractedData.depositAmount)
         updates.depositAmount = extractedData.depositAmount;
-      }
-
-      if (extractedData.maturityValue) {
+      if (extractedData.maturityValue)
         updates.maturityValue = extractedData.maturityValue;
-      }
 
       if (extractedData.maturityDate) {
         const maturityDate = parseDateString(extractedData.maturityDate);
-        if (maturityDate && !isNaN(maturityDate.getTime())) {
-          updates.maturityDate = maturityDate;
-        }
+        if (maturityDate) updates.maturityDate = maturityDate;
       }
 
       if (extractedData.dateOfDeposit) {
         const dateOfDeposit = parseDateString(extractedData.dateOfDeposit);
-        if (dateOfDeposit && !isNaN(dateOfDeposit.getTime())) {
-          updates.dateOfDeposit = dateOfDeposit;
-        }
+        if (dateOfDeposit) updates.dateOfDeposit = dateOfDeposit;
       }
 
-      if (extractedData.accountNo) {
-        updates.accountNo = extractedData.accountNo;
-      }
+      if (extractedData.accountNo)
+        updates.accountNo = extractedData.accountNo.trim();
+      if (extractedData.fdrNumber)
+        updates.fdrNumber = extractedData.fdrNumber.trim();
+      if (extractedData.accountName)
+        updates.accountName = extractedData.accountName.trim();
 
-      if (extractedData.fdrNumber) {
-        updates.fdrNumber = extractedData.fdrNumber;
-      }
-
-      if (extractedData.accountName) {
-        updates.accountName = extractedData.accountName;
-      }
-
-      form.reset({
-        ...form.getValues(),
-        ...updates
-      });
+      form.reset({ ...form.getValues(), ...updates });
 
       if (!extractedData.depositAmount || !extractedData.dateOfDeposit) {
-        setExtractionError('Some required fields could not be extracted. Please verify the values.');
+        setExtractionError(
+          "Some fields could not be extracted automatically. Please verify manually."
+        );
       }
-
-    } catch (error) {
-      console.error('FDR extraction error:', error);
+    } catch (err: unknown) {
+      console.error("Extraction Error:", err);
       setExtractionError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to extract document data. Please check the file format and quality.'
+        err instanceof Error
+          ? err.message
+          : "Unexpected error while extracting data. Please try again."
       );
     } finally {
       setExtracting(false);
     }
   };
 
+  // ------------------ TAG HANDLING -------------------
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && newTag.trim()) {
+    if (e.key === "Enter" && newTag.trim()) {
       e.preventDefault();
-      const currentTags = form.getValues('tags') || [];
+      const currentTags = form.getValues("tags") || [];
       if (!currentTags.includes(newTag.trim())) {
-        form.setValue('tags', [...currentTags, newTag.trim()]);
+        form.setValue("tags", [...currentTags, newTag.trim()]);
       }
-      setNewTag('');
+      setNewTag("");
     }
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    const currentTags = form.getValues('tags') || [];
-    form.setValue('tags', currentTags.filter(tag => tag !== tagToRemove));
+    const currentTags = form.getValues("tags") || [];
+    form.setValue(
+      "tags",
+      currentTags.filter((tag) => tag !== tagToRemove)
+    );
   };
 
+  // ------------------ SUBMIT HANDLING -------------------
+  const handleSubmit = async (data: FDRFormData) => {
+    try {
+      setSubmissionError(null);
+      await onSubmit(data);
+    } catch (err: unknown) {
+      console.error("Form Submission Error:", err);
+      setSubmissionError(
+        err instanceof Error
+          ? err.message
+          : "Submission failed. Please check your connection or try again later."
+      );
+    }
+  };
+
+  // ------------------ COMPONENT RENDER -------------------
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        {/* Document Upload */}
+        {/* 🌟 Global Alerts */}
+        {extractionError && (
+          <Alert variant="destructive">
+            <AlertDescription>{extractionError}</AlertDescription>
+          </Alert>
+        )}
+        {submissionError && (
+          <Alert variant="destructive">
+            <AlertDescription>{submissionError}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* 📄 Document Upload */}
         <FormField
           control={form.control}
           name="documentFile"
@@ -176,6 +222,11 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
                     {...field}
                     disabled={extracting}
                   />
+                  {fileName && !extracting && (
+                    <p className="text-sm text-muted-foreground">
+                      Uploaded: {fileName}
+                    </p>
+                  )}
                   {extracting && (
                     <div className="flex items-center space-x-2">
                       <LoadingSpinner />
@@ -184,11 +235,6 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
                       </span>
                     </div>
                   )}
-                  {extractionError && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{extractionError}</AlertDescription>
-                    </Alert>
-                  )}
                 </div>
               </FormControl>
               <FormMessage />
@@ -196,7 +242,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           )}
         />
 
-        {/* Category */}
+        {/* 🏦 Category */}
         <FormField
           control={form.control}
           name="category"
@@ -221,7 +267,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           )}
         />
 
-        {/* Bank Name and Account Number */}
+        {/* 🧾 Bank Details */}
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -236,7 +282,6 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
               </FormItem>
             )}
           />
-
           <FormField
             control={form.control}
             name="accountNo"
@@ -252,38 +297,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           />
         </div>
 
-        {/* FDR Number and Account Name */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField
-            control={form.control}
-            name="fdrNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>FD/BG Number</FormLabel>
-                <FormControl>
-                  <Input {...field} placeholder="FDR or BG number" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="accountName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Account Name</FormLabel>
-                <FormControl>
-                  <Input {...field} placeholder="Account holder name" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {/* Deposit Amount and Maturity Value */}
+        {/* 💰 Deposit & Maturity */}
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -293,19 +307,18 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
                 <FormLabel>Deposit Amount *</FormLabel>
                 <FormControl>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2">₹</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2">
+                      ₹
+                    </span>
                     <Input
                       type="text"
-                      placeholder="Enter deposit amount"
-                      {...field}
                       className="pl-7"
-                      value={field.value.toLocaleString('en-IN')}
+                      placeholder="Enter deposit amount"
+                      value={field.value.toLocaleString("en-IN")}
                       onChange={(e) => {
-                        const value = e.target.value.replace(/,/g, '');
+                        const value = e.target.value.replace(/,/g, "");
                         const numValue = Number(value);
-                        if (!isNaN(numValue)) {
-                          field.onChange(numValue);
-                        }
+                        if (!isNaN(numValue)) field.onChange(numValue);
                       }}
                     />
                   </div>
@@ -314,7 +327,6 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
               </FormItem>
             )}
           />
-
           <FormField
             control={form.control}
             name="maturityValue"
@@ -323,19 +335,18 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
                 <FormLabel>Maturity Value</FormLabel>
                 <FormControl>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2">₹</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2">
+                      ₹
+                    </span>
                     <Input
                       type="text"
-                      placeholder="Enter maturity value"
-                      {...field}
                       className="pl-7"
-                      value={field.value ? field.value.toLocaleString('en-IN') : ''}
+                      placeholder="Enter maturity value"
+                      value={field.value ? field.value.toLocaleString("en-IN") : ""}
                       onChange={(e) => {
-                        const value = e.target.value.replace(/,/g, '');
+                        const value = e.target.value.replace(/,/g, "");
                         const numValue = Number(value);
-                        if (!isNaN(numValue)) {
-                          field.onChange(numValue);
-                        }
+                        if (!isNaN(numValue)) field.onChange(numValue);
                       }}
                     />
                   </div>
@@ -346,7 +357,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           />
         </div>
 
-        {/* Date Fields */}
+        {/* 📅 Dates */}
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -364,7 +375,9 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
                           !field.value && "text-muted-foreground"
                         )}
                       >
-                        {field.value ? format(field.value, "PPP") : <span>Select date</span>}
+                        {field.value
+                          ? format(field.value, "PPP")
+                          : "Select date"}
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
@@ -382,7 +395,6 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
               </FormItem>
             )}
           />
-
           <FormField
             control={form.control}
             name="maturityDate"
@@ -399,7 +411,9 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
                           !field.value && "text-muted-foreground"
                         )}
                       >
-                        {field.value ? format(field.value, "PPP") : <span>Select date</span>}
+                        {field.value
+                          ? format(field.value, "PPP")
+                          : "Select date"}
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
@@ -419,7 +433,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           />
         </div>
 
-        {/* Contract Number and POC */}
+        {/* 🏗️ Contract + POC */}
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -434,7 +448,6 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
               </FormItem>
             )}
           />
-
           <FormField
             control={form.control}
             name="poc"
@@ -450,7 +463,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           />
         </div>
 
-        {/* Location */}
+        {/* 📍 Location + Details */}
         <FormField
           control={form.control}
           name="location"
@@ -465,7 +478,6 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           )}
         />
 
-        {/* Contract Details */}
         <FormField
           control={form.control}
           name="contractDetails"
@@ -475,8 +487,8 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
               <FormControl>
                 <Textarea
                   {...field}
-                  placeholder="Description of work or contract details"
                   rows={3}
+                  placeholder="Description of work or contract details"
                 />
               </FormControl>
               <FormMessage />
@@ -484,7 +496,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           )}
         />
 
-        {/* Status */}
+        {/* 🔖 Status */}
         <FormField
           control={form.control}
           name="status"
@@ -509,7 +521,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           )}
         />
 
-        {/* Tags */}
+        {/* 🏷️ Tags */}
         <FormField
           control={form.control}
           name="tags"
@@ -545,7 +557,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           )}
         />
 
-        {/* Form Actions */}
+        {/* 🚀 Actions */}
         <div className="flex justify-end gap-4">
           <Button
             type="button"
@@ -559,7 +571,9 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
             type="submit"
             disabled={extracting || form.formState.isSubmitting}
           >
-            {(extracting || form.formState.isSubmitting) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {(extracting || form.formState.isSubmitting) && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             Submit FDR Details
           </Button>
         </div>

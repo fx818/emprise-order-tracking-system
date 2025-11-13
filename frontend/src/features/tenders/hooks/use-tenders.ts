@@ -34,13 +34,13 @@ export function useTenders() {
       if (status && status !== 'ALL') {
         queryParams.append('status', status);
       }
-      
+
       const queryString = queryParams.toString();
       const url = `/tenders${queryString ? `?${queryString}` : ''}`;
-      
+
       // Use a more general type for the response to handle different structures
       const response = await apiClient.get<TenderListResponse | PaginatedTenderResponse>(url);
-      
+
       // Handle different response structures
       if (response.data && typeof response.data === 'object') {
         if ('data' in response.data) {
@@ -52,7 +52,7 @@ export function useTenders() {
           return (response.data as TenderListResponse).data;
         }
       }
-      
+
       // If response doesn't match expected structure, return empty array
       return [];
     } catch (error: any) {
@@ -77,34 +77,28 @@ export function useTenders() {
       setLoading(false);
     }
   }, [showError]);
-
-  // POST /tenders - Create a new tender
+  // ✅ Enhanced Tender Creation with Complete Error Handling
   const createTender = useCallback(async (formData: TenderFormData) => {
     try {
       setLoading(true);
 
-      // Create form data for file upload
+      // --- Prepare form data (safe file + JSON handling)
       const form = new FormData();
       for (const key in formData) {
-        if (key === 'documentFile' && formData.documentFile) {
-          form.append('documentFile', formData.documentFile as File);
-        } else if (key === 'nitDocumentFile' && formData.nitDocumentFile) {
-          form.append('nitDocumentFile', formData.nitDocumentFile as File);
-        } else if (key === 'emdDocumentFile' && formData.emdDocumentFile) {
-          form.append('emdDocumentFile', formData.emdDocumentFile as File);
-        } else if (key === 'tags' && Array.isArray(formData.tags)) {
-          form.append('tags', JSON.stringify(formData.tags));
+        const value = formData[key as keyof TenderFormData];
+
+        if (key.endsWith('DocumentFile') && value instanceof File) {
+          form.append(key, value);
+        } else if (key === 'tags' && Array.isArray(value)) {
+          form.append('tags', JSON.stringify(value));
         } else if (key === 'emdSubmissionDate' || key === 'emdMaturityDate') {
-          // Handle date fields
-          const dateValue = formData[key];
-          if (dateValue) {
-            form.append(key, dateValue.toISOString());
-          }
-        } else if (formData[key as keyof TenderFormData] !== undefined && formData[key as keyof TenderFormData] !== null) {
-          form.append(key, String(formData[key as keyof TenderFormData]));
+          if (value instanceof Date) form.append(key, value.toISOString());
+        } else if (value !== undefined && value !== null) {
+          form.append(key, String(value));
         }
       }
 
+      // --- API Request
       const response = await apiClient.post<SingleTenderResponse>('/tenders', form, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -113,13 +107,61 @@ export function useTenders() {
 
       showSuccess('Tender created successfully');
       return response.data.data;
+
     } catch (error: any) {
-      showError(error.response?.data?.message || 'Failed to create tender');
-      throw error;
+      console.error('Tender creation error:', error);
+
+      // ✅ 1️⃣ Detect common network-level or Axios-level errors
+      if (error.code === 'ERR_NETWORK') {
+        showError('Network error: Please check your internet connection.');
+      }
+      else if (error.code === 'ECONNABORTED') {
+        showError('Request timeout: The server took too long to respond.');
+      }
+
+      // ✅ 2️⃣ Handle API responses (4xx / 5xx)
+      else if (error.response) {
+        const { status, data } = error.response;
+        const message =
+          data?.message ||
+          data?.error ||
+          (typeof data === 'string' ? data : null) ||
+          'An unknown server error occurred.';
+
+        // More descriptive messages per status
+        if (status === 400) {
+          showError(`Validation failed: ${message}`);
+        } else if (status === 401) {
+          showError('Unauthorized: Please log in again.');
+        } else if (status === 403) {
+          showError('Forbidden: You do not have permission to perform this action.');
+        } else if (status === 404) {
+          showError('Endpoint not found: Please contact support.');
+        } else if (status >= 500) {
+          showError(`Server error (${status}): ${message}`);
+        } else {
+          showError(message);
+        }
+
+        // Optionally rethrow for upper-level handlers
+        throw new Error(message);
+      }
+
+      // ✅ 3️⃣ Catch JSON parse / unexpected / frontend code errors
+      else if (error instanceof SyntaxError) {
+        showError('Invalid data format received from the server.');
+      }
+      else {
+        showError(error.message || 'Unexpected error occurred while creating tender.');
+      }
+
+      throw error; // keep consistent with your original logic
+
     } finally {
       setLoading(false);
     }
   }, [showSuccess, showError]);
+
 
   // PUT /tenders/{id} - Update a tender
   const updateTender = useCallback(async (id: string, formData: Partial<TenderFormData>) => {

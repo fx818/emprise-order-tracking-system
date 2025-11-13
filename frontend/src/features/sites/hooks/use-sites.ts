@@ -96,8 +96,8 @@ export function useSites(): SitesHookReturn {
       showSuccess('Site created successfully');
       return response.data.data;
     } catch (error: any) {
-      console.error('Site creation error:', error.response || error);
-      showError(error.response?.data?.message || 'Failed to create site');
+      console.error('Site creation error:', error.response.data.message || error);
+      showError(error.response.data.message || 'Failed to create site here ');
       throw error;
     } finally {
       setLoading(false);

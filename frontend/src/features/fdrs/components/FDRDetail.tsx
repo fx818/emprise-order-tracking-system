@@ -1,7 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { format, differenceInDays } from "date-fns";
-import { ArrowLeft, AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { format, differenceInDays, isValid } from "date-fns";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  Loader2,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -14,28 +20,46 @@ import { Alert, AlertDescription } from "../../../components/ui/alert";
 import { useToast } from "../../../hooks/use-toast-app";
 import { useFDRs } from "../hooks/use-fdrs";
 import type { FDR } from "../types/fdr";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../../../components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../../../components/ui/dialog";
 import { Badge } from "../../../components/ui/badge";
 
 export function FDRDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { showError } = useToast();
+  const { showError, showSuccess } = useToast();
   const [fdr, setFDR] = useState<FDR | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const { getFDRById, updateFDRStatus, deleteFDR } = useFDRs();
 
+  // ✅ Fetch details with full error handling
   const fetchFDRDetails = async () => {
+    if (!id) {
+      showError("Invalid FDR ID");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      if (!id) return;
       const data = await getFDRById(id);
+      if (!data) {
+        throw new Error("No FDR found with this ID");
+      }
       setFDR(data);
-    } catch (error) {
-      showError("Failed to fetch FDR details");
+    } catch (error: any) {
       console.error("Error fetching FDR:", error);
+      showError(error.message || "Failed to fetch FDR details");
+      setFDR(null);
     } finally {
       setLoading(false);
     }
@@ -43,56 +67,67 @@ export function FDRDetail() {
 
   useEffect(() => {
     fetchFDRDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // ✅ Safe date formatting
   const formatDate = (dateString: string | Date | null | undefined) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
+      if (!isValid(date)) return "Invalid Date";
       return format(date, "PPP");
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid Date';
+    } catch {
+      return "Invalid Date";
     }
   };
 
-  const formatCurrency = (value: number | undefined): string => {
-    if (!value) return 'N/A';
-    return `₹${value.toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`;
+  // ✅ Safe currency formatting
+  const formatCurrency = (value: number | undefined | null): string => {
+    if (value == null || isNaN(value)) return "N/A";
+    try {
+      return `₹${value.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    } catch {
+      return "₹0.00";
+    }
   };
 
+  // ✅ Handle delete safely
   const handleDelete = async () => {
+    if (!id) return;
     try {
-      if (!id) return;
       setIsDeleting(true);
       await deleteFDR(id);
-      navigate('/fdrs');
-    } catch (error) {
-      console.error('Error deleting FDR:', error);
+      showSuccess("FDR deleted successfully");
+      navigate("/fdrs");
+    } catch (error: any) {
+      console.error("Error deleting FDR:", error);
+      showError(error.message || "Failed to delete FDR");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleStatusUpdate = async (status: FDR['status']) => {
+  // ✅ Handle status update safely
+  const handleStatusUpdate = async (status: FDR["status"]) => {
+    if (!id) return;
     try {
-      if (!id) return;
       setIsUpdatingStatus(true);
       await updateFDRStatus(id, status);
       await fetchFDRDetails();
-    } catch (error) {
-      console.error('Error updating FDR status:', error);
+      showSuccess(`FDR marked as ${status}`);
+    } catch (error: any) {
+      console.error("Error updating FDR status:", error);
+      showError(error.message || "Failed to update FDR status");
     } finally {
       setIsUpdatingStatus(false);
     }
   };
 
+  // ✅ Render loading, empty, or valid data
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -100,44 +135,59 @@ export function FDRDetail() {
   if (!fdr) {
     return (
       <Alert variant="destructive">
-        <AlertDescription>FDR not found</AlertDescription>
+        <XCircle className="h-4 w-4" />
+        <AlertDescription>FDR not found or failed to load details.</AlertDescription>
       </Alert>
     );
   }
 
-  const daysUntilMaturity = fdr.maturityDate ? differenceInDays(new Date(fdr.maturityDate), new Date()) : null;
+  const daysUntilMaturity =
+    fdr.maturityDate && isValid(new Date(fdr.maturityDate))
+      ? differenceInDays(new Date(fdr.maturityDate), new Date())
+      : null;
 
   return (
     <div className="space-y-6">
       {/* Header Section */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={() => navigate("/fdrs")} disabled={loading}>
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/fdrs")}
+            disabled={loading}
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to FDRs
           </Button>
         </div>
+
         <div className="flex space-x-4">
-          {fdr.status === 'RUNNING' && (
+          {fdr.status === "RUNNING" && (
             <>
               <Button
                 variant="outline"
-                onClick={() => handleStatusUpdate('COMPLETED')}
+                onClick={() => handleStatusUpdate("COMPLETED")}
                 disabled={isUpdatingStatus}
               >
-                {isUpdatingStatus ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                {isUpdatingStatus && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
                 Mark as Completed
               </Button>
               <Button
                 variant="outline"
-                onClick={() => handleStatusUpdate('RETURNED')}
+                onClick={() => handleStatusUpdate("RETURNED")}
                 disabled={isUpdatingStatus}
               >
-                {isUpdatingStatus ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                {isUpdatingStatus && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
                 Mark as Returned
               </Button>
             </>
           )}
+
+          {/* Delete Confirmation Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="destructive">
@@ -149,13 +199,20 @@ export function FDRDetail() {
               <DialogHeader>
                 <DialogTitle>Confirm Deletion</DialogTitle>
                 <DialogDescription>
-                  Are you sure you want to delete this FDR? This action cannot be undone.
+                  Are you sure you want to delete this FDR? This action cannot be
+                  undone.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => {}}>Cancel</Button>
-                <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-                  {isDeleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                <Button variant="outline">Cancel</Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
                   Delete
                 </Button>
               </DialogFooter>
@@ -165,14 +222,17 @@ export function FDRDetail() {
       </div>
 
       {/* Maturity Warning */}
-      {daysUntilMaturity !== null && daysUntilMaturity <= 30 && daysUntilMaturity > 0 && (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            This FDR will mature in {daysUntilMaturity} days ({formatDate(fdr.maturityDate)})
-          </AlertDescription>
-        </Alert>
-      )}
+      {daysUntilMaturity !== null &&
+        daysUntilMaturity <= 30 &&
+        daysUntilMaturity > 0 && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              This FDR will mature in {daysUntilMaturity} days (
+              {formatDate(fdr.maturityDate)})
+            </AlertDescription>
+          </Alert>
+        )}
 
       {/* Basic Information */}
       <Card>
@@ -180,32 +240,22 @@ export function FDRDetail() {
           <CardTitle>Basic Information</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Category</p>
-            <Badge variant={fdr.category === 'FD' ? 'default' : 'secondary'}>
-              {fdr.category === 'FD' ? 'Fixed Deposit' : 'Bank Guarantee'}
+          <Field label="Category">
+            <Badge
+              variant={fdr.category === "FD" ? "default" : "secondary"}
+            >
+              {fdr.category === "FD" ? "Fixed Deposit" : "Bank Guarantee"}
             </Badge>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Status</p>
+          </Field>
+
+          <Field label="Status">
             <Badge>{fdr.status}</Badge>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Bank Name</p>
-            <p className="text-sm">{fdr.bankName}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Account Number</p>
-            <p className="text-sm">{fdr.accountNo || 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">FDR/BG Number</p>
-            <p className="text-sm">{fdr.fdrNumber || 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Account Name</p>
-            <p className="text-sm">{fdr.accountName || 'N/A'}</p>
-          </div>
+          </Field>
+
+          <Field label="Bank Name">{fdr.bankName || "N/A"}</Field>
+          <Field label="Account Number">{fdr.accountNo || "N/A"}</Field>
+          <Field label="FDR/BG Number">{fdr.fdrNumber || "N/A"}</Field>
+          <Field label="Account Name">{fdr.accountName || "N/A"}</Field>
         </CardContent>
       </Card>
 
@@ -215,55 +265,29 @@ export function FDRDetail() {
           <CardTitle>Financial Details</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Deposit Amount</p>
-            <p className="text-lg font-semibold">{formatCurrency(fdr.depositAmount)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Maturity Value</p>
-            <p className="text-lg font-semibold">{formatCurrency(fdr.maturityValue)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Date of Deposit</p>
-            <p className="text-sm">{formatDate(fdr.dateOfDeposit)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Maturity Date</p>
-            <p className="text-sm">{formatDate(fdr.maturityDate)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Deposit Amount</p>
-            <p className="text-sm">{formatCurrency(fdr.depositAmount)}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Maturity Value</p>
-            <p className="text-sm">{formatCurrency(fdr.maturityValue)}</p>
-          </div>
+          <Field label="Deposit Amount">
+            {formatCurrency(fdr.depositAmount)}
+          </Field>
+          <Field label="Maturity Value">
+            {formatCurrency(fdr.maturityValue)}
+          </Field>
+          <Field label="Date of Deposit">{formatDate(fdr.dateOfDeposit)}</Field>
+          <Field label="Maturity Date">{formatDate(fdr.maturityDate)}</Field>
         </CardContent>
       </Card>
 
-      {/* Contract/Project Information */}
+      {/* Contract/Project Info */}
       <Card>
         <CardHeader>
           <CardTitle>Contract/Project Information</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Contract Number</p>
-            <p className="text-sm">{fdr.contractNo || 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Point of Contact</p>
-            <p className="text-sm">{fdr.poc || 'N/A'}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Location</p>
-            <p className="text-sm">{fdr.location || 'N/A'}</p>
-          </div>
-          <div className="md:col-span-2">
-            <p className="text-sm font-medium text-muted-foreground">Contract Details</p>
-            <p className="text-sm whitespace-pre-wrap">{fdr.contractDetails || 'N/A'}</p>
-          </div>
+          <Field label="Contract Number">{fdr.contractNo || "N/A"}</Field>
+          <Field label="Point of Contact">{fdr.poc || "N/A"}</Field>
+          <Field label="Location">{fdr.location || "N/A"}</Field>
+          <Field label="Contract Details" span>
+            {fdr.contractDetails || "N/A"}
+          </Field>
         </CardContent>
       </Card>
 
@@ -275,7 +299,11 @@ export function FDRDetail() {
           </CardHeader>
           <CardContent>
             <Button variant="outline" asChild>
-              <a href={fdr.documentUrl} target="_blank" rel="noopener noreferrer">
+              <a
+                href={fdr.documentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 View Document
               </a>
             </Button>
@@ -284,7 +312,7 @@ export function FDRDetail() {
       )}
 
       {/* Tags */}
-      {fdr.tags && fdr.tags.length > 0 && (
+      {Array.isArray(fdr.tags) && fdr.tags.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Tags</CardTitle>
@@ -303,3 +331,22 @@ export function FDRDetail() {
     </div>
   );
 }
+
+/** ✅ Reusable Field component for cleaner code */
+function Field({
+  label,
+  children,
+  span,
+}: {
+  label: string;
+  children: React.ReactNode;
+  span?: boolean;
+}) {
+  return (
+    <div className={span ? "md:col-span-2" : ""}>
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <div className="text-sm mt-1 break-words">{children}</div>
+    </div>
+  );
+}
+

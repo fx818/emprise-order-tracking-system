@@ -13,29 +13,22 @@ export function useAuth() {
   const { setUser: setStoreUser, setIsAuthenticated } = useAuthStore();
   const { toast } = useToast();
 
-  const handleError = (error: any) => {
-    const errorMessage = error.response?.data?.message;
-    
-    if (errorMessage?.includes('already exists')) {
-      toast({
-        variant: "destructive",
-        title: "Registration Failed",
-        description: "An account with this email already exists. Please try logging in instead.",
-      });
-    } else if (errorMessage?.includes('credentials')) {
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: "Invalid email or password. Please check your credentials and try again.",
-      });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage || "An unexpected error occurred. Please try again later.",
-      });
-    }
+  const handleError = (error: any, fallbackTitle = "Error") => {
+    console.error("Auth error:", error);
+
+    const backendMessage =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message ||
+      "Something went wrong. Please try again.";
+
+    toast({
+      variant: "destructive",
+      title: fallbackTitle,
+      description: backendMessage,
+    });
   };
+
 
   const login = async (credentials: LoginFormData) => {
     try {
@@ -52,11 +45,11 @@ export function useAuth() {
         title: "Success",
         description: "Successfully logged in. Welcome back!",
       });
-      
+
       const defaultRoute = getDefaultRouteForRole(user.role);
       navigate(defaultRoute);
     } catch (error: any) {
-      handleError(error);
+      handleError(error, "Login Failed");
     } finally {
       setLoading(false);
     }
@@ -75,17 +68,18 @@ export function useAuth() {
 
       toast({
         title: "Success",
-        description: "Account created successfully. Welcome to the platform!",
+        description: "Account created successfully. Welcome!",
       });
-      
+
       const defaultRoute = getDefaultRouteForRole(user.role);
       navigate(defaultRoute);
     } catch (error: any) {
-      handleError(error);
+      handleError(error, "Registration Failed");
     } finally {
       setLoading(false);
     }
   };
+
 
   return {
     login,

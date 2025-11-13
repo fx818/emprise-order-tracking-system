@@ -74,3 +74,67 @@ export class ItemValidator {
       : ResultUtils.ok([{ field: 'id', message: 'Invalid ID format' }]);
   }
 }
+
+
+// export class ItemValidator {
+//   validate(dto: CreateItemDto): Result<ValidationError[]> {
+//     const errors: ValidationError[] = [];
+
+//     // Name validation
+//     if (!dto.name?.trim()) {
+//       errors.push({ field: "name", message: "Name is required" });
+//     } else if (dto.name.length < 2 || dto.name.length > 100) {
+//       errors.push({
+//         field: "name",
+//         message: "Name must be between 2 and 100 characters",
+//       });
+//     }
+
+//     // Description validation (optional)
+//     if (dto.description && (dto.description.length < 10 || dto.description.length > 500)) {
+//       errors.push({
+//         field: "description",
+//         message: "Description must be between 10 and 500 characters",
+//       });
+//     }
+
+//     // Unit of Measurement
+//     if (!dto.uom?.trim()) {
+//       errors.push({
+//         field: "uom",
+//         message: "Unit of measurement is required",
+//       });
+//     }
+
+//     // HSN Code validation (optional)
+//     const hsnRegex = /^\d{4,8}$/;
+//     if (dto.hsnCode && !hsnRegex.test(dto.hsnCode)) {
+//       errors.push({
+//         field: "hsnCode",
+//         message: "Invalid HSN code format",
+//       });
+//     }
+
+//     // -------------------------
+//     // Return Result Correctly
+//     // -------------------------
+//     if (errors.length > 0) {
+//       return ResultUtils.fail("Validation failed", errors);
+//     }
+
+//     return ResultUtils.ok([]);
+//   }
+
+//   validateId(id: string): Result<ValidationError[]> {
+//     const uuidRegex =
+//       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+//     if (!uuidRegex.test(id)) {
+//       return ResultUtils.fail("Validation failed", [
+//         { field: "id", message: "Invalid ID format" },
+//       ]);
+//     }
+
+//     return ResultUtils.ok([]);
+//   }
+// }

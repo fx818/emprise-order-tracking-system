@@ -52,7 +52,7 @@ export class AuthService {
       if (!user) {
         return {
           isSuccess: false,
-          error: 'Invalid credentials'
+          error: 'User with given email does not exist'
         };
       }
       // Verify password
@@ -60,7 +60,7 @@ export class AuthService {
       if (!isPasswordValid) {
         return {
           isSuccess: false,
-          error: 'Invalid credentials'
+          error: 'Invalid Password'
         };
       }
       // Generate token

@@ -10,6 +10,7 @@ import { EmailService } from '../../infrastructure/services/EmailService';
 import { EmailLog, EmailStatus } from '../../domain/entities/EmailLog';
 import { TokenService } from '../../infrastructure/services/TokenService';
 import { UserRole } from '../../domain/entities/User';
+import { JsonValue } from '@prisma/client/runtime/library';
 
 interface DocumentData {
   id: string;
@@ -67,7 +68,6 @@ export class BudgetaryOfferService {
       customerId: data.customerId || '',
     };
   }
-
   async sendOfferByEmail(params: {
     offerId: string;
     to: string[];
@@ -77,25 +77,53 @@ export class BudgetaryOfferService {
     content: string;
   }): Promise<Result<{ success: boolean; messageId?: string }>> {
     try {
-      const offer = await this.repository.findById(params.offerId);
+      // --- Validate Input ---
+      if (!params.offerId || !Array.isArray(params.to) || params.to.length === 0) {
+        return ResultUtils.fail('Invalid request: offerId and recipients are required.');
+      }
+      if (!params.subject?.trim()) {
+        return ResultUtils.fail('Email subject is required.');
+      }
+      if (!params.content?.trim()) {
+        return ResultUtils.fail('Email content is required.');
+      }
+
+      // --- Fetch offer details ---
+      let offer;
+      try {
+        offer = await this.repository.findById(params.offerId);
+      } catch (dbError) {
+        console.error('Database error while fetching offer:', dbError);
+        return ResultUtils.fail('Database error while fetching offer. Please try again later.');
+      }
+
       if (!offer) {
-        return ResultUtils.fail('Budgetary offer not found');
+        return ResultUtils.fail('Budgetary offer not found.');
       }
 
       if (!offer.createdBy) {
-        return ResultUtils.fail('Creator details not found');
+        return ResultUtils.fail('Creator details are missing for this offer.');
       }
 
-      // Prepare document data
+      // --- Parse work items safely ---
+      let workItems;
+      try {
+        workItems = typeof offer.workItems === 'string'
+          ? JSON.parse(offer.workItems)
+          : offer.workItems;
+      } catch (parseError) {
+        console.error('Error parsing workItems JSON:', parseError);
+        workItems = []; // fallback
+      }
+
+      // --- Prepare document data ---
       const documentData = {
         id: offer.id,
         offerId: offer.offerId,
         offerDate: offer.offerDate,
         toAuthority: offer.toAuthority,
         subject: offer.subject,
-        workItems: typeof offer.workItems === 'string'
-          ? JSON.parse(offer.workItems)
-          : offer.workItems,
+        workItems,
         termsConditions: offer.termsConditions,
         status: offer.status,
         createdBy: {
@@ -107,40 +135,58 @@ export class BudgetaryOfferService {
         customerId: offer.customerId || '',
       };
 
-      // Send email with fresh PDF
-      const emailResult = await this.emailService.sendBudgetaryOfferEmail({
-        to: params.to,
-        cc: params.cc,
-        bcc: params.bcc,
-        subject: params.subject,
-        html: params.content,
-        offerData: documentData as BudgetaryOfferData
-      });
-
-      if (!emailResult.success) {
-        return ResultUtils.fail(emailResult.error || 'Failed to send email');
+      // --- Send Email ---
+      let emailResult;
+      try {
+        emailResult = await this.emailService.sendBudgetaryOfferEmail({
+          to: params.to,
+          cc: params.cc,
+          bcc: params.bcc,
+          subject: params.subject,
+          html: params.content,
+          offerData: documentData as BudgetaryOfferData
+        });
+      } catch (emailError) {
+        console.error('Email service error:', emailError);
+        return ResultUtils.fail('Email service failed. Please check configuration or try again.');
       }
 
-      // Log email attempt
-      await this.repository.logEmail({
-        budgetaryOfferId: params.offerId,
-        to: params.to,
-        cc: params.cc || [],
-        bcc: params.bcc || [],
-        subject: params.subject,
-        content: params.content,
-        messageId: emailResult.messageId,
-        status: EmailStatus.SENT
-      });
+      if (!emailResult || !emailResult.success) {
+        const reason = emailResult?.error || 'Unknown email sending failure.';
+        console.warn('Email sending failed:', reason);
+        return ResultUtils.fail(`Failed to send email: ${reason}`);
+      }
 
+      // --- Log email attempt ---
+      try {
+        await this.repository.logEmail({
+          budgetaryOfferId: params.offerId,
+          to: params.to,
+          cc: params.cc || [],
+          bcc: params.bcc || [],
+          subject: params.subject,
+          content: params.content,
+          messageId: emailResult.messageId,
+          status: EmailStatus.SENT
+        });
+      } catch (logError) {
+        console.error('Error logging email attempt:', logError);
+        // Don’t fail the request just because logging failed
+      }
+
+      // --- Success ---
       return ResultUtils.ok({
         success: true,
         messageId: emailResult.messageId
       });
     } catch (error) {
-      console.error('Email sending error:', error);
-      return ResultUtils.fail('Failed to process email: ' +
-        (error instanceof Error ? error.message : 'Unknown error'));
+      // --- Global Fallback ---
+      console.error('Unexpected error in sendOfferByEmail:', error);
+
+      let message = 'An unexpected error occurred while processing your request.';
+      if (error instanceof Error) message += ` ${error.message}`;
+
+      return ResultUtils.fail(message);
     }
   }
 
@@ -153,186 +199,387 @@ export class BudgetaryOfferService {
       endDate?: Date;
       status?: EmailStatus;
     }
-  ): Promise<Result<{
-    logs: EmailLog[];
-    total: number;
-    pages: number;
-  }>> {
+  ): Promise<Result<{ logs: EmailLog[]; total: number; pages: number }>> {
     try {
-      // First check if offer exists
-      const offer = await this.repository.findById(offerId);
-      if (!offer) {
-        return ResultUtils.fail('Budgetary offer not found');
+      // --- 1️⃣ Validate Input ---
+      if (!offerId || typeof offerId !== 'string') {
+        return ResultUtils.fail('Invalid offer ID provided.');
       }
 
-      // Get logs with pagination
-      const page = params?.page || 1;
-      const limit = params?.limit || 10;
+      // Validate pagination parameters
+      const page = Math.max(1, Number(params?.page) || 1);
+      const limit = Math.min(100, Math.max(1, Number(params?.limit) || 10)); // max limit = 100
       const skip = (page - 1) * limit;
 
-      const logs = await this.repository.getEmailLogs(offerId, {
-        skip,
-        take: limit,
-        startDate: params?.startDate,
-        endDate: params?.endDate,
-        status: params?.status
-      });
+      // Validate date range if provided
+      if (params?.startDate && params?.endDate) {
+        if (params.startDate > params.endDate) {
+          return ResultUtils.fail('Start date cannot be after end date.');
+        }
+      }
 
-      const total = await this.repository.countEmailLogs(offerId, {
-        startDate: params?.startDate,
-        endDate: params?.endDate,
-        status: params?.status
-      });
+      // --- 2️⃣ Verify Offer Exists ---
+      let offer;
+      try {
+        offer = await this.repository.findById(offerId);
+      } catch (dbError) {
+        console.error('Database error while fetching offer:', dbError);
+        return ResultUtils.fail('Database error while verifying offer existence.');
+      }
 
+      if (!offer) {
+        return ResultUtils.fail('Budgetary offer not found.');
+      }
+
+      // --- 3️⃣ Fetch Logs with Pagination ---
+      let logs: EmailLog[] = [];
+      try {
+        logs = await this.repository.getEmailLogs(offerId, {
+          skip,
+          take: limit,
+          startDate: params?.startDate,
+          endDate: params?.endDate,
+          status: params?.status,
+        });
+      } catch (logError) {
+        console.error('Error fetching email logs from DB:', logError);
+        return ResultUtils.fail('Database error while fetching email logs.');
+      }
+
+      // --- 4️⃣ Count Total Logs ---
+      let total = 0;
+      try {
+        total = await this.repository.countEmailLogs(offerId, {
+          startDate: params?.startDate,
+          endDate: params?.endDate,
+          status: params?.status,
+        });
+      } catch (countError) {
+        console.error('Error counting email logs:', countError);
+        // Even if count fails, return partial logs for user
+        return ResultUtils.ok({
+          logs,
+          total: logs.length,
+          pages: 1,
+        });
+      }
+
+      // --- 5️⃣ Return Successful Result ---
       return ResultUtils.ok({
         logs,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit) || 1,
       });
     } catch (error) {
-      console.error('Error fetching email logs:', error);
-      return ResultUtils.fail('Failed to fetch email logs: ' +
-        (error instanceof Error ? error.message : 'Unknown error'));
+      // --- 6️⃣ Catch Unexpected Runtime Errors ---
+      console.error('Unexpected error in getEmailLogs:', error);
+
+      let message = 'An unexpected error occurred while fetching email logs.';
+      if (error instanceof Error) message += ` ${error.message}`;
+
+      return ResultUtils.fail(message);
     }
   }
 
-  async approveOffer(id: string, userId: string, comments?: string): Promise<Result<BudgetaryOffer>> {
+  // import { JsonValue } from '@prisma/client/runtime/library'; // ✅ Import this at the top
+
+  async approveOffer(
+    id: string,
+    userId: string,
+    comments?: string
+  ): Promise<Result<BudgetaryOffer>> {
     try {
-      const offerResult = await this.repository.findById(id);
-      if (!offerResult) {
-        return ResultUtils.fail('Budgetary offer not found');
+      // --- 1️⃣ Input Validation ---
+      if (!id || !userId) {
+        return ResultUtils.fail('Offer ID and user ID are required for approval.');
       }
 
+      // --- 2️⃣ Fetch Offer Safely ---
+      let offerResult;
+      try {
+        offerResult = await this.repository.findById(id);
+      } catch (dbError) {
+        console.error('Database error while fetching offer:', dbError);
+        return ResultUtils.fail('Database error while fetching offer.');
+      }
+
+      if (!offerResult) {
+        return ResultUtils.fail('Budgetary offer not found.');
+      }
+
+      // --- 3️⃣ Business Rules ---
       if (offerResult.status !== 'PENDING_APPROVAL') {
-        return ResultUtils.fail('Only PENDING_APPROVAL offers can be approved');
+        return ResultUtils.fail('Only PENDING_APPROVAL offers can be approved.');
       }
 
       if (offerResult.approverId && offerResult.approverId !== userId) {
-        return ResultUtils.fail('Only the assigned approver can approve this offer');
+        return ResultUtils.fail('Only the assigned approver can approve this offer.');
       }
 
-      const approvalAction = {
+      // --- 4️⃣ Construct Approval Action (proper Date type) ---
+      const approvalAction: ApprovalAction = {
         actionType: 'APPROVE',
         userId,
-        timestamp: new Date().toISOString(),
-        comments,
+        timestamp: new Date(), // ✅ use Date instead of string
+        comments: comments || 'No comments provided.',
         previousStatus: offerResult.status,
-        newStatus: 'APPROVED'
+        newStatus: 'APPROVED',
       };
 
       const now = new Date();
-      const currentHistory = (offerResult.approvalHistory || []) as any[];
+      const currentHistory: ApprovalAction[] = Array.isArray(offerResult.approvalHistory)
+        ? (offerResult.approvalHistory as unknown as ApprovalAction[])
+        : [];
 
-      const updatedOffer = await this.repository.update(id, {
-        status: 'APPROVED',
-        approverId: userId,
-        approvalComments: comments,
-        approvalDate: now,
-        approvalHistory: [...currentHistory, approvalAction] as any
-      });
-
-      // Generate PDF after approval
-      const pdfResult = await this.generatePDF(id);
-      if (!pdfResult.isSuccess || !pdfResult.data) {
-        return ResultUtils.fail('Failed to generate approved document');
+      // --- 5️⃣ Update Offer Status ---
+      let updatedOffer;
+      try {
+        updatedOffer = await this.repository.update(id, {
+          status: 'APPROVED',
+          approverId: userId,
+          approvalComments: comments,
+          approvalDate: now,
+          approvalHistory: [...currentHistory, approvalAction] as ApprovalAction[],
+        });
+      } catch (updateError) {
+        console.error('Error updating offer to APPROVED:', updateError);
+        return ResultUtils.fail('Failed to update offer status during approval.');
       }
 
-      // Update offer with the generated PDF URL and hash
-      await this.repository.update(id, {
-        documentUrl: pdfResult.data.url,
-        documentHash: pdfResult.data.hash
-      });
+      // --- 6️⃣ Generate PDF ---
+      let pdfResult;
+      try {
+        pdfResult = await this.generatePDF(id);
+      } catch (pdfError) {
+        console.error('Error during PDF generation:', pdfError);
+        return ResultUtils.fail('PDF generation service failed.');
+      }
 
+      if (!pdfResult?.isSuccess || !pdfResult?.data) {
+        return ResultUtils.fail('Failed to generate approved document.');
+      }
+
+      // --- 7️⃣ Update Offer with PDF URL and Hash ---
+      try {
+        await this.repository.update(id, {
+          documentUrl: pdfResult.data.url,
+          documentHash: pdfResult.data.hash,
+        });
+      } catch (pdfUpdateError) {
+        console.error('Error updating offer with PDF URL/hash:', pdfUpdateError);
+        // Non-critical — log only
+      }
+
+      // --- 8️⃣ Return Result ---
       return ResultUtils.ok(this.convertToBudgetaryOffer(updatedOffer));
     } catch (error) {
-      return ResultUtils.fail('Failed to approve offer: ' +
-        (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Unexpected error in approveOffer:', error);
+      return ResultUtils.fail(
+        'Failed to approve offer: ' +
+        (error instanceof Error ? error.message : 'Unknown error')
+      );
     }
   }
 
-  async rejectOffer(id: string, userId: string, comments?: string): Promise<Result<BudgetaryOffer>> {
+
+
+  async rejectOffer(
+    id: string,
+    userId: string,
+    comments?: string
+  ): Promise<Result<BudgetaryOffer>> {
     try {
-      const offerResult = await this.repository.findById(id);
+      // --- 1️⃣ Input Validation ---
+      if (!id || !userId) {
+        return ResultUtils.fail('Offer ID and user ID are required for rejection.');
+      }
+
+      // --- 2️⃣ Fetch Offer ---
+      let offerResult;
+      try {
+        offerResult = await this.repository.findById(id);
+      } catch (dbError) {
+        console.error('Database error while fetching offer:', dbError);
+        return ResultUtils.fail('Database error while fetching offer.');
+      }
+
       if (!offerResult) {
-        return ResultUtils.fail('Budgetary offer not found');
+        return ResultUtils.fail('Budgetary offer not found.');
       }
 
+      // --- 3️⃣ Business Rules ---
       if (offerResult.status !== 'PENDING_APPROVAL') {
-        return ResultUtils.fail('Only PENDING_APPROVAL offers can be rejected');
+        return ResultUtils.fail('Only PENDING_APPROVAL offers can be rejected.');
       }
 
-      // Check if the user is the assigned approver
       if (offerResult.approverId && offerResult.approverId !== userId) {
-        return ResultUtils.fail('Only the assigned approver can reject this offer');
+        return ResultUtils.fail('Only the assigned approver can reject this offer.');
       }
 
-      const approvalAction = {
+      // --- 4️⃣ Build Rejection Action ---
+      const approvalAction: ApprovalAction = {
         actionType: 'REJECT',
         userId,
-        timestamp: new Date().toISOString(), // Convert Date to string for JSON compatibility
-        comments,
+        // use Date object for consistency with approveOffer's ApprovalAction
+        timestamp: new Date(),
+        comments: comments || 'No comments provided.',
         previousStatus: offerResult.status,
-        newStatus: 'REJECTED'
+        newStatus: 'REJECTED',
       };
 
       const now = new Date();
+      const currentHistory: ApprovalAction[] = Array.isArray(offerResult.approvalHistory)
+        ? (offerResult.approvalHistory as unknown as ApprovalAction[])
+        : [];
 
-      const currentHistory = (offerResult.approvalHistory || []) as any[];
+      // --- 5️⃣ Update Offer ---
+      let updatedOffer;
+      try {
+        updatedOffer = await this.repository.update(id, {
+          status: 'REJECTED',
+          approverId: userId,
+          approvalComments: comments,
+          approvalDate: now,
+          approvalHistory: [...currentHistory, approvalAction] as ApprovalAction[],
+        });
+      } catch (updateError) {
+        console.error('Error updating offer to REJECTED:', updateError);
+        return ResultUtils.fail('Failed to update offer status during rejection.');
+      }
 
-      const updatedOffer = await this.repository.update(id, {
-        status: 'REJECTED',
-        approverId: userId,
-        approvalComments: comments,
-        approvalDate: now,
-        approvalHistory: [...currentHistory, approvalAction] as any // Cast to any to avoid type conflict
-      });
-
+      // --- 6️⃣ Return Final Offer ---
       return ResultUtils.ok(this.convertToBudgetaryOffer(updatedOffer));
     } catch (error) {
-      return ResultUtils.fail('Failed to reject offer: ' +
-        (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Unexpected error in rejectOffer:', error);
+      return ResultUtils.fail(
+        'Failed to reject offer: ' +
+        (error instanceof Error ? error.message : 'Unknown error')
+      );
     }
   }
 
-  async createOffer(dto: CreateBudgetaryOfferDto, userId: string): Promise<Result<BudgetaryOffer>> {
-    const validation = this.validator.validate(dto);
-
-    if (validation.isSuccess && validation.data && validation.data.length > 0) {
-      return ResultUtils.fail('Validation failed: ' +
-        validation.data.map(err => `${err.field}: ${err.message}`).join(', '));
-    }
-
-    // console.log('Creating offer with data:', dto);
+  async createOffer(
+    dto: CreateBudgetaryOfferDto,
+    userId: string
+  ): Promise<Result<BudgetaryOffer>> {
     try {
-      const offerId = `BO/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`;
+      // --- 1️⃣ Basic Input Validation ---
+      if (!userId || typeof userId !== "string") {
+        return ResultUtils.fail("Invalid user: userId is required.");
+      }
 
-      const offer = await this.repository.create({
-        offerId,
-        offerDate: new Date(dto.offerDate),
-        toAuthority: dto.toAuthority,
-        subject: dto.subject,
-        workItems: dto.workItems.map(item => ({
-          description: item.description,
-          quantity: item.quantity,
-          unitOfMeasurement: item.unitOfMeasurement,
-          baseRate: item.baseRate,
-          taxRate: item.taxRate || 0
-        })),
-        termsConditions: dto.termsConditions,
-        status: 'DRAFT',
-        tags: dto.tags,
-        createdById: userId,
-        approverId: dto.approverId,
-        documentUrl: '',
-        documentHash: '',
-        approvalHistory: [], // Initialize empty approval history
-        customerId: dto.customerId,
+      if (!dto || typeof dto !== "object") {
+        return ResultUtils.fail("Invalid request: offer data (DTO) is required.");
+      }
+
+      // --- 2️⃣ DTO Validation ---
+      const validation = this.validator.validate(dto);
+      if (
+        validation &&
+        Array.isArray((validation as any).data) &&
+        (validation as any).data.length > 0
+      ) {
+        const errors = (validation as any).data
+          .map((err: any) => `${err.field}: ${err.message}`)
+          .join(", ");
+        return ResultUtils.fail(`Validation failed:\n${errors}`);
+
+      }
+
+      // --- 3️⃣ Business Rule Checks ---
+      if (!Array.isArray(dto.workItems) || dto.workItems.length === 0) {
+        return ResultUtils.fail("At least one work item is required.");
+      }
+
+      if (!dto.subject?.trim()) {
+        return ResultUtils.fail("Offer subject cannot be empty.");
+      }
+
+      if (!dto.toAuthority?.trim()) {
+        return ResultUtils.fail("To Authority must be specified.");
+      }
+
+      // --- 4️⃣ Safe Work Item Mapping ---
+      const workItems = dto.workItems.map((item: any, index: number) => {
+        const description = item?.description?.trim();
+        const quantity = Number(item?.quantity) || 0;
+        const baseRate = Number(item?.baseRate ?? item?.rate ?? 0);
+        const taxRate = Number(item?.taxRate ?? 0);
+        const unitOfMeasurement = item?.unitOfMeasurement || item?.unit || "unit";
+
+        if (!description) {
+          throw new Error(`Work item #${index + 1} is missing a description.`);
+        }
+
+        return { description, quantity, baseRate, taxRate, unitOfMeasurement };
       });
 
+      // --- 5️⃣ Generate Offer ID Safely ---
+      const offerId = `BO/${new Date().getFullYear()}/${Math.floor(
+        1000 + Math.random() * 9000
+      )}`;
+
+      // --- 6️⃣ Create Offer Record ---
+      const offer = await this.repository.create({
+        offerId,
+        offerDate: dto.offerDate ? new Date(dto.offerDate) : new Date(),
+        toAuthority: dto.toAuthority.trim(),
+        subject: dto.subject.trim(),
+        workItems,
+        termsConditions: dto.termsConditions || "",
+        status: "DRAFT",
+        tags: dto.tags || [],
+        createdById: userId,
+        approverId: dto.approverId ?? undefined,
+        documentUrl: "",
+        documentHash: "",
+        approvalHistory: [] as ApprovalAction[],
+        customerId: dto.customerId || "",
+      });
+
+      if (!offer) {
+        return ResultUtils.fail("Offer creation failed: repository returned no data.");
+      }
+
+      // --- 7️⃣ Return Success ---
       return ResultUtils.ok(this.convertToBudgetaryOffer(offer));
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      return ResultUtils.fail('Failed to create budgetary offer: ' + errorMessage);
+      // --- 8️⃣ Error Handling ---
+      console.error("Error in createOffer:", error);
+
+      // Normalize message
+      let errorMessage = "Unknown error occurred while creating the offer.";
+      if (error instanceof Error) errorMessage = error.message;
+      else if (typeof error === "string") errorMessage = error;
+      else if (typeof error === "object" && error !== null) {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch {
+          errorMessage = "Non-serializable error encountered.";
+        }
+      }
+
+      // Detect Prisma or known DB errors
+      const errorCode =
+        typeof error === "object" && error !== null && "code" in error
+          ? (error as any).code
+          : undefined;
+
+      const prismaDetails =
+        errorCode === "P2002"
+          ? "Duplicate entry (unique constraint violation)."
+          : errorCode === "P2003"
+            ? "Invalid foreign key reference."
+            : errorCode === "P2025"
+              ? "Database record not found."
+              : undefined;
+
+      const safeMessage = prismaDetails
+        ? `Failed to create budgetary offer: ${prismaDetails}`
+        : `Failed to create budgetary offer: ${errorMessage}${errorCode ? ` (code=${errorCode})` : ""
+        }`;
+
+      return ResultUtils.fail(safeMessage);
     }
   }
 

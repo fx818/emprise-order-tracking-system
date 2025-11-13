@@ -25,7 +25,11 @@ export class VendorService {
       const vendor = await this.repository.create(dto);
       return ResultUtils.ok(vendor);
     } catch (error) {
-      throw new AppError('Failed to create vendor');
+      console.log('Create vendor error:', error);
+      const message = error instanceof Error
+        ? error.message
+        : (typeof error === 'string' ? error : 'Failed to create vendor');
+      throw new AppError(`Failed to create vendor. ${message}`);
     }
   }
 
@@ -44,7 +48,10 @@ export class VendorService {
       const vendor = await this.repository.update(id, dto);
       return ResultUtils.ok(vendor);
     } catch (error) {
-      throw new AppError('Failed to update vendor');
+      const message = error instanceof Error
+        ? error.message
+        : (typeof error === 'string' ? error : 'Failed to update vendor');
+      throw new AppError(`Failed to update vendor. ${message}`);
     }
   }
 
@@ -58,7 +65,10 @@ export class VendorService {
       await this.repository.delete(id);
       return ResultUtils.ok(undefined);
     } catch (error) {
-      throw new AppError('Failed to delete vendor');
+      const message = error instanceof Error
+        ? error.message
+        : (typeof error === 'string' ? error : 'Failed to delete vendor');
+      throw new AppError(`Failed to delete vendor. ${message}`);
     }
   }
 
@@ -71,7 +81,10 @@ export class VendorService {
 
       return ResultUtils.ok(vendor);
     } catch (error) {
-      throw new AppError('Failed to fetch vendor');
+      const message = error instanceof Error
+        ? error.message
+        : (typeof error === 'string' ? error : 'Failed to fetch vendor');
+      throw new AppError(`Failed to fetch vendor. ${message}`);
     }
   }
 
@@ -89,7 +102,10 @@ export class VendorService {
         total
       });
     } catch (error) {
-      throw new AppError('Failed to fetch vendors');
+      const message = error instanceof Error
+        ? error.message
+        : (typeof error === 'string' ? error : 'Failed to fetch vendors');
+      throw new AppError(`Failed to fetch vendors. ${message}`);
     }
   }
 }

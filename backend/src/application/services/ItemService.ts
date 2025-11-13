@@ -17,17 +17,69 @@ export class ItemService {
       if (!validationResult.isSuccess) {
         return ResultUtils.fail('Validation processing failed');
       }
-
+      console.log('Validation Result:', validationResult);
       if (validationResult.data && validationResult.data.length > 0) {
         return ResultUtils.fail('Validation failed', validationResult.data);
       }
-
+      console.log('Creating item with DTO:', dto);
       const item = await this.repository.create(dto);
       return ResultUtils.ok(item);
     } catch (error) {
-      throw new AppError('Failed to create item');
+      const message = error instanceof Error
+        ? error.message
+        : (typeof error === 'string' ? error : 'Failed to create item');
+      throw new AppError(`Failed to create item. ${message}`);
     }
   }
+
+  // async createItem(dto: CreateItemDto): Promise<Result<any>> {
+  //   try {
+  //     const validationResult = this.validator.validate(dto);
+
+  //     // -------------------------
+  //     // Validation failed
+  //     // -------------------------
+  //     if (!validationResult.isSuccess) {
+  //       return validationResult;  // already contains message + errors
+  //     }
+
+  //     // -------------------------
+  //     // Create in DB
+  //     // -------------------------
+  //     const item = await this.repository.create(dto);
+  //     return ResultUtils.ok(item);
+
+  //   } catch (error: any) {
+  //     console.error("Create Item Error:", error);
+
+  //     // Prisma unique constraint
+  //     if (error.code === "P2002") {
+  //       return ResultUtils.fail("Item already exists with these unique fields.");
+  //     }
+
+  //     // Foreign key constraint
+  //     if (error.code === "P2003") {
+  //       return ResultUtils.fail("Invalid reference. Please check related IDs.");
+  //     }
+
+  //     // Required related record missing
+  //     if (error.code === "P2025") {
+  //       return ResultUtils.fail("Related record not found.");
+  //     }
+
+  //     // Custom errors
+  //     if (error instanceof AppError) {
+  //       return ResultUtils.fail(error.message);
+  //     }
+
+  //     // Unknown error
+  //     return ResultUtils.fail(
+  //       "Failed to create item.",
+  //       process.env.NODE_ENV === "development" ? error.message : undefined
+  //     );
+  //   }
+  // }
+
 
   async updateItem(id: string, dto: UpdateItemDto): Promise<Result<any>> {
     try {

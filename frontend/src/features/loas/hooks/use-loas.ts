@@ -497,6 +497,50 @@ export function useLOAs() {
     }
   };
 
+  // Get general FDRs linked to an LOA
+  const getGeneralFdrs = async (loaId: string) => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get(`/loas/${loaId}/general-fdrs`);
+      return response.data.data || [];
+    } catch (error: any) {
+      handleError(error, 'Failed to fetch general FDRs');
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Link an existing FDR to an LOA
+  const linkGeneralFdr = async (loaId: string, fdrId: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      await apiClient.post(`/loas/${loaId}/general-fdrs/${fdrId}`);
+      showSuccess('FDR linked successfully to LOA');
+      return true;
+    } catch (error: any) {
+      handleError(error, 'Failed to link FDR to LOA');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Unlink an FDR from an LOA
+  const unlinkGeneralFdr = async (loaId: string, fdrId: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      await apiClient.delete(`/loas/${loaId}/general-fdrs/${fdrId}`);
+      showSuccess('FDR unlinked successfully from LOA');
+      return true;
+    } catch (error: any) {
+      handleError(error, 'Failed to unlink FDR from LOA');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     getLOAs,
@@ -516,5 +560,8 @@ export function useLOAs() {
     getLoaWithFinancials,
     updatePendingSplit,
     updateManualFinancials,
+    getGeneralFdrs,
+    linkGeneralFdr,
+    unlinkGeneralFdr,
   };
 }

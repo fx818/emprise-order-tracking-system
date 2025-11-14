@@ -810,4 +810,76 @@ export class LoaService {
             return ResultUtils.fail('Failed to update manual financial overrides');
         }
     }
+
+    /**
+     * Get general FDRs linked to an LOA
+     */
+    async getGeneralFdrsForLoa(loaId: string): Promise<Result<any[]>> {
+        try {
+            // Verify LOA exists
+            const loa = await this.repository.findById(loaId);
+            if (!loa) {
+                return ResultUtils.fail('LOA not found');
+            }
+
+            const fdrs = await this.repository.findGeneralFdrs(loaId);
+            return ResultUtils.ok(fdrs);
+        } catch (error) {
+            console.error('LOA getGeneralFdrsForLoa error:', error);
+            return ResultUtils.fail('Failed to fetch general FDRs for LOA');
+        }
+    }
+
+    /**
+     * Link an existing FDR to an LOA
+     */
+    async linkGeneralFdr(loaId: string, fdrId: string, userId?: string): Promise<Result<void>> {
+        try {
+            // Verify LOA exists
+            const loa = await this.repository.findById(loaId);
+            if (!loa) {
+                return ResultUtils.fail('LOA not found');
+            }
+
+            // Verify FDR exists (assuming there's an FDR repository)
+            // TODO: Add FDR existence check when FDR repository is available
+
+            // Check if already linked
+            const isLinked = await this.repository.isGeneralFdrLinked(loaId, fdrId);
+            if (isLinked) {
+                return ResultUtils.fail('FDR is already linked to this LOA');
+            }
+
+            await this.repository.linkGeneralFdr(loaId, fdrId, userId);
+            return ResultUtils.ok(undefined);
+        } catch (error) {
+            console.error('LOA linkGeneralFdr error:', error);
+            return ResultUtils.fail('Failed to link FDR to LOA');
+        }
+    }
+
+    /**
+     * Unlink an FDR from an LOA
+     */
+    async unlinkGeneralFdr(loaId: string, fdrId: string): Promise<Result<void>> {
+        try {
+            // Verify LOA exists
+            const loa = await this.repository.findById(loaId);
+            if (!loa) {
+                return ResultUtils.fail('LOA not found');
+            }
+
+            // Check if linked
+            const isLinked = await this.repository.isGeneralFdrLinked(loaId, fdrId);
+            if (!isLinked) {
+                return ResultUtils.fail('FDR is not linked to this LOA');
+            }
+
+            await this.repository.unlinkGeneralFdr(loaId, fdrId);
+            return ResultUtils.ok(undefined);
+        } catch (error) {
+            console.error('LOA unlinkGeneralFdr error:', error);
+            return ResultUtils.fail('Failed to unlink FDR from LOA');
+        }
+    }
 }

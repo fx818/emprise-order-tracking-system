@@ -82,11 +82,19 @@ export interface PurchaseOrder {
 export interface FDRSummary {
   id: string;
   bankName: string;
+  fdrNumber?: string;
+  accountNo?: string;
   depositAmount: number;
   dateOfDeposit: string;
   maturityDate?: string;
   status: string;
   category: string;
+  linkedAt?: string;
+  linkedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
 // Interface for LOA with additional properties
@@ -96,6 +104,7 @@ export interface LOA extends Omit<LOAFormData, 'documentFile' | 'invoicePdfFile'
   documentUrl?: string;
   sdFdr?: FDRSummary;
   pgFdr?: FDRSummary;
+  generalFdrs?: FDRSummary[];
   // Pending breakdown (LOA-level)
   recoverablePending: number;
   paymentPending: number;

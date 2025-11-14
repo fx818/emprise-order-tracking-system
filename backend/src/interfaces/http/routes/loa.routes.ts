@@ -477,5 +477,105 @@ export function loaRoutes(controller: LoaController) {
     controller.updateManualFinancials
   );
 
+  /**
+   * @swagger
+   * /api/loas/{id}/general-fdrs:
+   *   get:
+   *     tags:
+   *       - LOAs
+   *     summary: Get general FDRs linked to an LOA
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: LOA ID
+   *     responses:
+   *       200:
+   *         description: List of general FDRs
+   *       404:
+   *         description: LOA not found
+   */
+  router.get(
+    '/:id/general-fdrs',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF, UserRole.USER]),
+    controller.getGeneralFdrs
+  );
+
+  /**
+   * @swagger
+   * /api/loas/{id}/general-fdrs/{fdrId}:
+   *   post:
+   *     tags:
+   *       - LOAs
+   *     summary: Link an existing FDR to an LOA
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: LOA ID
+   *       - in: path
+   *         name: fdrId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: FDR ID to link
+   *     responses:
+   *       201:
+   *         description: FDR linked successfully
+   *       400:
+   *         description: FDR already linked or validation error
+   *       404:
+   *         description: LOA or FDR not found
+   */
+  router.post(
+    '/:id/general-fdrs/:fdrId',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF]),
+    controller.linkGeneralFdr
+  );
+
+  /**
+   * @swagger
+   * /api/loas/{id}/general-fdrs/{fdrId}:
+   *   delete:
+   *     tags:
+   *       - LOAs
+   *     summary: Unlink an FDR from an LOA
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: LOA ID
+   *       - in: path
+   *         name: fdrId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: FDR ID to unlink
+   *     responses:
+   *       200:
+   *         description: FDR unlinked successfully
+   *       400:
+   *         description: FDR not linked or validation error
+   *       404:
+   *         description: LOA not found
+   */
+  router.delete(
+    '/:id/general-fdrs/:fdrId',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF]),
+    controller.unlinkGeneralFdr
+  );
+
   return router;
 }

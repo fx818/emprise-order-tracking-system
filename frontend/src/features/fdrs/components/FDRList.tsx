@@ -9,6 +9,7 @@ import {
   Upload,
   RefreshCw,
   XCircle,
+  Pencil,
 } from "lucide-react";
 
 import { Button } from "../../../components/ui/button";
@@ -198,6 +199,10 @@ export function FDRList() {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate(`/fdrs/${row.id}/edit`)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate(`/fdrs/${row.id}`)}>
               <FileText className="mr-2 h-4 w-4" />
               View Details

@@ -61,6 +61,8 @@ export interface LOA {
     sdFdr?: {
         id: string;
         bankName: string;
+        fdrNumber?: string;
+        accountNo?: string;
         depositAmount: number;
         dateOfDeposit: Date;
         maturityDate?: Date;
@@ -70,12 +72,31 @@ export interface LOA {
     pgFdr?: {
         id: string;
         bankName: string;
+        fdrNumber?: string;
+        accountNo?: string;
         depositAmount: number;
         dateOfDeposit: Date;
         maturityDate?: Date;
         status: string;
         category: string;
     };
+    generalFdrs?: {
+        id: string;
+        bankName: string;
+        fdrNumber?: string;
+        accountNo?: string;
+        depositAmount: number;
+        dateOfDeposit: Date;
+        maturityDate?: Date;
+        status: string;
+        category: string;
+        linkedAt?: Date;
+        linkedBy?: {
+            id: string;
+            name: string;
+            email: string;
+        };
+    }[];
     tags: string[];
     createdAt: Date;
     updatedAt: Date;

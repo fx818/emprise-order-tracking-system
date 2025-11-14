@@ -20,6 +20,7 @@ model User {
   createdOffers  BudgetaryOffer[] @relation("CreatedBy")
   approvedPOs    PurchaseOrder[]  @relation("POApprovedBy")
   createdPOs     PurchaseOrder[]  @relation("POCreatedBy")
+  linkedLoaFdrs  LOAGeneralFDR[]
 }
 
 model BudgetaryOffer {
@@ -134,6 +135,7 @@ model LOA {
   purchaseOrders         PurchaseOrder[]
   sdFdr                  FDR?              @relation("LOASecurityDeposit", fields: [sdFdrId], references: [id])
   pgFdr                  FDR?              @relation("LOAPerformanceGuarantee", fields: [pgFdrId], references: [id])
+  generalFdrs            LOAGeneralFDR[]
 
   @@index([siteId])
   @@index([dueDate])
@@ -370,12 +372,30 @@ model FDR {
   offer           BudgetaryOffer? @relation(fields: [offerId], references: [id], map: "EMD_offerId_fkey")
   loaForSD        LOA?            @relation("LOASecurityDeposit")
   loaForPG        LOA?            @relation("LOAPerformanceGuarantee")
+  generalLoaLinks LOAGeneralFDR[]
 
   @@index([offerId])
   @@index([status])
   @@index([maturityDate])
   @@index([category])
   @@map("fdrs")
+}
+
+model LOAGeneralFDR {
+  id        String   @id @default(uuid())
+  loaId     String
+  fdrId     String
+  linkedAt  DateTime @default(now())
+  linkedBy  String?
+  loa       LOA      @relation(fields: [loaId], references: [id], onDelete: Cascade)
+  fdr       FDR      @relation(fields: [fdrId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [linkedBy], references: [id])
+
+  @@unique([loaId, fdrId])
+  @@index([loaId])
+  @@index([fdrId])
+  @@index([linkedBy])
+  @@map("loa_general_fdrs")
 }
 
 enum UserRole {

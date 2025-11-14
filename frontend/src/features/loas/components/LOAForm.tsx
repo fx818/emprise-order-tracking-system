@@ -1260,9 +1260,12 @@ export function LOAForm({
                         )}
                       >
                         {field.value
-                          ? fdrs.find((fdr) => fdr.id === field.value)
-                              ? `${fdrs.find((fdr) => fdr.id === field.value)?.bankName} - ₹${fdrs.find((fdr) => fdr.id === field.value)?.depositAmount} (${fdrs.find((fdr) => fdr.id === field.value)?.category})`
-                              : "Select FDR for Security Deposit"
+                          ? (() => {
+                              const selectedFdr = fdrs.find((fdr) => fdr.id === field.value);
+                              return selectedFdr
+                                ? `${selectedFdr.bankName}${selectedFdr.fdrNumber ? ` - ${selectedFdr.fdrNumber}` : ''} - ₹${selectedFdr.depositAmount} (${selectedFdr.category})`
+                                : "Select FDR for Security Deposit";
+                            })()
                           : "Select FDR for Security Deposit"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -1290,7 +1293,7 @@ export function LOAForm({
                                     : "opacity-0"
                                 )}
                               />
-                              {fdr.bankName} - ₹{fdr.depositAmount} ({fdr.category}) - {fdr.status}
+                              {fdr.bankName}{fdr.fdrNumber ? ` - ${fdr.fdrNumber}` : ''} - ₹{fdr.depositAmount} ({fdr.category}) - {fdr.status}
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -1368,9 +1371,12 @@ export function LOAForm({
                         )}
                       >
                         {field.value
-                          ? fdrs.find((fdr) => fdr.id === field.value)
-                              ? `${fdrs.find((fdr) => fdr.id === field.value)?.bankName} - ₹${fdrs.find((fdr) => fdr.id === field.value)?.depositAmount} (${fdrs.find((fdr) => fdr.id === field.value)?.category})`
-                              : "Select FDR for Performance Guarantee"
+                          ? (() => {
+                              const selectedFdr = fdrs.find((fdr) => fdr.id === field.value);
+                              return selectedFdr
+                                ? `${selectedFdr.bankName}${selectedFdr.fdrNumber ? ` - ${selectedFdr.fdrNumber}` : ''} - ₹${selectedFdr.depositAmount} (${selectedFdr.category})`
+                                : "Select FDR for Performance Guarantee";
+                            })()
                           : "Select FDR for Performance Guarantee"}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -1398,7 +1404,7 @@ export function LOAForm({
                                     : "opacity-0"
                                 )}
                               />
-                              {fdr.bankName} - ₹{fdr.depositAmount} ({fdr.category}) - {fdr.status}
+                              {fdr.bankName}{fdr.fdrNumber ? ` - ${fdr.fdrNumber}` : ''} - ₹{fdr.depositAmount} ({fdr.category}) - {fdr.status}
                             </CommandItem>
                           ))}
                         </CommandGroup>

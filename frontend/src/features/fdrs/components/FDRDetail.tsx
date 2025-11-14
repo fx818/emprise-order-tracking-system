@@ -7,6 +7,7 @@ import {
   Loader2,
   Trash2,
   XCircle,
+  Pencil,
 } from "lucide-react";
 import {
   Card,
@@ -162,6 +163,15 @@ export function FDRDetail() {
         </div>
 
         <div className="flex space-x-4">
+          {/* Edit Button */}
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/fdrs/${id}/edit`)}
+          >
+            <Pencil className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+
           {fdr.status === "RUNNING" && (
             <>
               <Button

@@ -39,9 +39,10 @@ interface FDRFormProps {
   initialData?: Partial<FDRFormData>;
   onSubmit: (data: FDRFormData) => Promise<void>;
   onCancel: () => void;
+  mode?: 'create' | 'edit';
 }
 
-export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
+export function FDRForm({ initialData, onSubmit, onCancel, mode = 'create' }: FDRFormProps) {
   const [extracting, setExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
@@ -206,7 +207,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
           name="documentFile"
           render={({ field: { value, onChange, ...field } }) => (
             <FormItem>
-              <FormLabel>FDR Document</FormLabel>
+              <FormLabel>FDR Document {mode === 'edit' && '(Optional - upload to replace)'}</FormLabel>
               <FormControl>
                 <div className="space-y-2">
                   <Input
@@ -574,7 +575,7 @@ export function FDRForm({ initialData, onSubmit, onCancel }: FDRFormProps) {
             {(extracting || form.formState.isSubmitting) && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Submit FDR Details
+            {mode === 'edit' ? 'Update FDR Details' : 'Submit FDR Details'}
           </Button>
         </div>
       </form>

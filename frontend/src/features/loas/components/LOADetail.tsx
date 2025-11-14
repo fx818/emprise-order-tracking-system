@@ -44,6 +44,8 @@ import {
 import { Badge } from "../../../components/ui/badge";
 import { StatusUpdateDialog } from "./StatusUpdateDialog"; // Import the new dialog
 import { OtherDocumentUploadDialog } from "./OtherDocumentUploadDialog";
+import { FDRCard } from "./FDRCard";
+import { LinkFDRDialog } from "./LinkFDRDialog";
 
 // Add formatCurrency helper function
 const formatCurrency = (value: number): string => {
@@ -94,7 +96,7 @@ const getStatusDisplayText = (status: LOA['status']) => {
 export function LOADetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { loading, getLOAById, deleteLOA, deleteAmendment, createOtherDocument, deleteOtherDocument, updatePendingSplit, updateManualFinancials } = useLOAs();
+  const { loading, getLOAById, deleteLOA, deleteAmendment, createOtherDocument, deleteOtherDocument, updatePendingSplit, updateManualFinancials, linkGeneralFdr, unlinkGeneralFdr } = useLOAs();
   const { loading: billsLoading, getBillsByLoaId, createBill, updateBill, deleteBill } = useBills();
   const [loa, setLOA] = useState<LOA | null>(null);
   const [bills, setBills] = useState<Invoice[]>([]);
@@ -111,6 +113,8 @@ export function LOADetail() {
   const [editingBill, setEditingBill] = useState<Invoice | undefined>();
   // Financial data edit dialog state
   const [financialDialogOpen, setFinancialDialogOpen] = useState(false);
+  // Link FDR dialog state
+  const [linkFDRDialogOpen, setLinkFDRDialogOpen] = useState(false);
 
   const fetchLOA = useCallback(async () => {
     if (!id) return;
@@ -305,6 +309,18 @@ export function LOADetail() {
     fetchLOA();
   };
 
+  const handleLinkFDR = async (fdrId: string) => {
+    if (!id) return;
+    await linkGeneralFdr(id, fdrId);
+    await fetchLOA(); // Refresh LOA to show new linked FDR
+  };
+
+  const handleUnlinkFDR = async (fdrId: string) => {
+    if (!id) return;
+    await unlinkGeneralFdr(id, fdrId);
+    await fetchLOA(); // Refresh LOA to remove unlinked FDR
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Section with Buttons */}
@@ -391,6 +407,9 @@ export function LOADetail() {
           </TabsTrigger>
           <TabsTrigger value="purchaseOrders">
             Purchase Orders ({loa.purchaseOrders.length})
+          </TabsTrigger>
+          <TabsTrigger value="fdrs">
+            FDRs ({((loa.sdFdr ? 1 : 0) + (loa.pgFdr ? 1 : 0) + (loa.generalFdrs?.length || 0))})
           </TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
@@ -608,10 +627,22 @@ export function LOADetail() {
                           <div className="text-sm font-medium text-muted-foreground mb-1">Bank Name</div>
                           <div className="text-sm font-semibold">{loa.sdFdr.bankName}</div>
                         </div>
+                        {loa.sdFdr.fdrNumber && (
+                          <div>
+                            <div className="text-sm font-medium text-muted-foreground mb-1">FDR/BG Number</div>
+                            <div className="text-sm font-semibold">{loa.sdFdr.fdrNumber}</div>
+                          </div>
+                        )}
                         <div>
                           <div className="text-sm font-medium text-muted-foreground mb-1">Deposit Amount</div>
                           <div className="text-sm font-semibold">{formatCurrency(loa.sdFdr.depositAmount)}</div>
                         </div>
+                        {loa.sdFdr.accountNo && (
+                          <div>
+                            <div className="text-sm font-medium text-muted-foreground mb-1">Account Number</div>
+                            <div className="text-sm">{loa.sdFdr.accountNo}</div>
+                          </div>
+                        )}
                         <div>
                           <div className="text-sm font-medium text-muted-foreground mb-1">Date of Deposit</div>
                           <div className="text-sm">{format(new Date(loa.sdFdr.dateOfDeposit), "PPP")}</div>
@@ -656,10 +687,22 @@ export function LOADetail() {
                           <div className="text-sm font-medium text-muted-foreground mb-1">Bank Name</div>
                           <div className="text-sm font-semibold">{loa.pgFdr.bankName}</div>
                         </div>
+                        {loa.pgFdr.fdrNumber && (
+                          <div>
+                            <div className="text-sm font-medium text-muted-foreground mb-1">FDR/BG Number</div>
+                            <div className="text-sm font-semibold">{loa.pgFdr.fdrNumber}</div>
+                          </div>
+                        )}
                         <div>
                           <div className="text-sm font-medium text-muted-foreground mb-1">Deposit Amount</div>
                           <div className="text-sm font-semibold">{formatCurrency(loa.pgFdr.depositAmount)}</div>
                         </div>
+                        {loa.pgFdr.accountNo && (
+                          <div>
+                            <div className="text-sm font-medium text-muted-foreground mb-1">Account Number</div>
+                            <div className="text-sm">{loa.pgFdr.accountNo}</div>
+                          </div>
+                        )}
                         <div>
                           <div className="text-sm font-medium text-muted-foreground mb-1">Date of Deposit</div>
                           <div className="text-sm">{format(new Date(loa.pgFdr.dateOfDeposit), "PPP")}</div>
@@ -934,6 +977,86 @@ export function LOADetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="fdrs">
+          <div className="space-y-4">
+            {/* Security Deposit FDR */}
+            {loa.sdFdr && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  Security Deposit (SD)
+                </h3>
+                <FDRCard fdr={loa.sdFdr} type="SD" readonly />
+              </div>
+            )}
+
+            {/* Performance Guarantee FDR */}
+            {loa.pgFdr && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  Performance Guarantee (PG)
+                </h3>
+                <FDRCard fdr={loa.pgFdr} type="PG" readonly />
+              </div>
+            )}
+
+            {/* General FDRs */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-muted-foreground">
+                  General FDRs
+                </h3>
+                <Button
+                  onClick={() => setLinkFDRDialogOpen(true)}
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Link FDR
+                </Button>
+              </div>
+
+              {loa.generalFdrs && loa.generalFdrs.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {loa.generalFdrs.map((fdr) => (
+                    <FDRCard
+                      key={fdr.id}
+                      fdr={fdr}
+                      type="general"
+                      onUnlink={handleUnlinkFDR}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    No general FDRs linked to this LOA yet.
+                    <br />
+                    <Button
+                      variant="link"
+                      onClick={() => setLinkFDRDialogOpen(true)}
+                      className="mt-2"
+                    >
+                      Link an existing FDR
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+
+          {/* Link FDR Dialog */}
+          <LinkFDRDialog
+            open={linkFDRDialogOpen}
+            onClose={() => setLinkFDRDialogOpen(false)}
+            onLink={handleLinkFDR}
+            loaId={id || ''}
+            linkedFdrIds={[
+              ...(loa.sdFdr ? [loa.sdFdr.id] : []),
+              ...(loa.pgFdr ? [loa.pgFdr.id] : []),
+              ...(loa.generalFdrs?.map(f => f.id) || []),
+            ]}
+          />
         </TabsContent>
 
         <TabsContent value="documents">

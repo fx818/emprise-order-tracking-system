@@ -645,4 +645,68 @@ export class LoaController {
       next(error);
     }
   };
+
+  /**
+   * Get general FDRs linked to an LOA
+   */
+  getGeneralFdrs = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      const result = await this.service.getGeneralFdrsForLoa(id);
+
+      if (!result.isSuccess) {
+        res.status(404).json({ message: result.error });
+        return;
+      }
+
+      res.json({ data: result.data });
+    } catch (error) {
+      console.error('LoaController getGeneralFdrs error:', error);
+      next(error);
+    }
+  };
+
+  /**
+   * Link an existing FDR to an LOA
+   */
+  linkGeneralFdr = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id, fdrId } = req.params;
+      const userId = (req as any).user?.id; // Get user ID from auth middleware
+
+      const result = await this.service.linkGeneralFdr(id, fdrId, userId);
+
+      if (!result.isSuccess) {
+        res.status(400).json({ message: result.error });
+        return;
+      }
+
+      res.status(201).json({ message: 'FDR linked successfully to LOA' });
+    } catch (error) {
+      console.error('LoaController linkGeneralFdr error:', error);
+      next(error);
+    }
+  };
+
+  /**
+   * Unlink an FDR from an LOA
+   */
+  unlinkGeneralFdr = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id, fdrId } = req.params;
+
+      const result = await this.service.unlinkGeneralFdr(id, fdrId);
+
+      if (!result.isSuccess) {
+        res.status(400).json({ message: result.error });
+        return;
+      }
+
+      res.status(200).json({ message: 'FDR unlinked successfully from LOA' });
+    } catch (error) {
+      console.error('LoaController unlinkGeneralFdr error:', error);
+      next(error);
+    }
+  };
 }

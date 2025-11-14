@@ -136,6 +136,28 @@ export class PrismaFdrRepository {
             subject: true,
           },
         },
+        generalLoaLinks: {
+          include: {
+            loa: {
+              select: {
+                id: true,
+                loaNumber: true,
+              },
+            },
+          },
+        },
+        loaForSD: {
+          select: {
+            id: true,
+            loaNumber: true,
+          },
+        },
+        loaForPG: {
+          select: {
+            id: true,
+            loaNumber: true,
+          },
+        },
       },
     });
   }

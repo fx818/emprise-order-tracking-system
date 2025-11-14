@@ -17,6 +17,7 @@ export class PrismaLoaRepository {
     inspectionAgency?: any;
     sdFdr?: any;
     pgFdr?: any;
+    generalFdrs?: any[];
   }): LOA {
     // Don't parse the deliveryPeriod as it's already an object
     return {
@@ -87,6 +88,8 @@ export class PrismaLoaRepository {
       sdFdr: prismaLoa.sdFdr ? {
         id: prismaLoa.sdFdr.id,
         bankName: prismaLoa.sdFdr.bankName,
+        fdrNumber: prismaLoa.sdFdr.fdrNumber || undefined,
+        accountNo: prismaLoa.sdFdr.accountNo || undefined,
         depositAmount: prismaLoa.sdFdr.depositAmount,
         dateOfDeposit: prismaLoa.sdFdr.dateOfDeposit,
         maturityDate: prismaLoa.sdFdr.maturityDate || undefined,
@@ -96,6 +99,8 @@ export class PrismaLoaRepository {
       pgFdr: prismaLoa.pgFdr ? {
         id: prismaLoa.pgFdr.id,
         bankName: prismaLoa.pgFdr.bankName,
+        fdrNumber: prismaLoa.pgFdr.fdrNumber || undefined,
+        accountNo: prismaLoa.pgFdr.accountNo || undefined,
         depositAmount: prismaLoa.pgFdr.depositAmount,
         dateOfDeposit: prismaLoa.pgFdr.dateOfDeposit,
         maturityDate: prismaLoa.pgFdr.maturityDate || undefined,
@@ -107,6 +112,19 @@ export class PrismaLoaRepository {
       manualTotalBilled: prismaLoa.manualTotalBilled || undefined,
       manualTotalReceived: prismaLoa.manualTotalReceived || undefined,
       manualTotalDeducted: prismaLoa.manualTotalDeducted || undefined,
+      generalFdrs: prismaLoa.generalFdrs?.map((link: any) => ({
+        id: link.fdr?.id || link.id,
+        bankName: link.fdr?.bankName || link.bankName,
+        fdrNumber: link.fdr?.fdrNumber || link.fdrNumber || undefined,
+        accountNo: link.fdr?.accountNo || link.accountNo || undefined,
+        depositAmount: link.fdr?.depositAmount || link.depositAmount,
+        dateOfDeposit: link.fdr?.dateOfDeposit || link.dateOfDeposit,
+        maturityDate: link.fdr?.maturityDate || link.maturityDate,
+        status: link.fdr?.status || link.status,
+        category: link.fdr?.category || link.category,
+        linkedAt: link.linkedAt,
+        linkedBy: link.user
+      })) || [],
       createdAt: prismaLoa.createdAt,
       updatedAt: prismaLoa.updatedAt
     };
@@ -328,7 +346,20 @@ export class PrismaLoaRepository {
         poc: true,
         inspectionAgency: true,
         sdFdr: true,
-        pgFdr: true
+        pgFdr: true,
+        generalFdrs: {
+          include: {
+            fdr: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { linkedAt: 'desc' }
+        }
       }
     });
 
@@ -351,7 +382,20 @@ export class PrismaLoaRepository {
         poc: true,
         inspectionAgency: true,
         sdFdr: true,
-        pgFdr: true
+        pgFdr: true,
+        generalFdrs: {
+          include: {
+            fdr: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { linkedAt: 'desc' }
+        }
       }
     });
 
@@ -480,7 +524,20 @@ export class PrismaLoaRepository {
         tender: true,  // Include tender data
         poc: true,  // Include POC data
         sdFdr: true,  // Include Security Deposit FDR
-        pgFdr: true  // Include Performance Guarantee FDR
+        pgFdr: true,  // Include Performance Guarantee FDR
+        generalFdrs: {
+          include: {
+            fdr: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { linkedAt: 'desc' }
+        }
       },
       orderBy
     });
@@ -737,6 +794,90 @@ export class PrismaLoaRepository {
       return invoice;
     } catch (error) {
       console.error('PrismaLoaRepository updateInvoice error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get general FDRs linked to an LOA
+   */
+  async findGeneralFdrs(loaId: string): Promise<any[]> {
+    try {
+      const links = await this.prisma.lOAGeneralFDR.findMany({
+        where: { loaId },
+        include: {
+          fdr: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { linkedAt: 'desc' }
+      });
+
+      return links.map(link => ({
+        ...link.fdr,
+        linkedAt: link.linkedAt,
+        linkedBy: link.user
+      }));
+    } catch (error) {
+      console.error('PrismaLoaRepository findGeneralFdrs error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Link an FDR to an LOA
+   */
+  async linkGeneralFdr(loaId: string, fdrId: string, userId?: string): Promise<void> {
+    try {
+      await this.prisma.lOAGeneralFDR.create({
+        data: {
+          loaId,
+          fdrId,
+          linkedBy: userId
+        }
+      });
+    } catch (error) {
+      console.error('PrismaLoaRepository linkGeneralFdr error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unlink an FDR from an LOA
+   */
+  async unlinkGeneralFdr(loaId: string, fdrId: string): Promise<void> {
+    try {
+      await this.prisma.lOAGeneralFDR.deleteMany({
+        where: {
+          loaId,
+          fdrId
+        }
+      });
+    } catch (error) {
+      console.error('PrismaLoaRepository unlinkGeneralFdr error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if an FDR is already linked to an LOA
+   */
+  async isGeneralFdrLinked(loaId: string, fdrId: string): Promise<boolean> {
+    try {
+      const link = await this.prisma.lOAGeneralFDR.findFirst({
+        where: {
+          loaId,
+          fdrId
+        }
+      });
+      return !!link;
+    } catch (error) {
+      console.error('PrismaLoaRepository isGeneralFdrLinked error:', error);
       throw error;
     }
   }

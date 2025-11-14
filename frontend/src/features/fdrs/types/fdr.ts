@@ -68,6 +68,25 @@ export interface FDR {
   };
   offerId?: string;
 
+  // LOA Links
+  generalLoaLinks?: Array<{
+    id: string;
+    loaId: string;
+    linkedAt: string;
+    loa: {
+      id: string;
+      loaNumber: string;
+    };
+  }>;
+  loaForSD?: {
+    id: string;
+    loaNumber: string;
+  };
+  loaForPG?: {
+    id: string;
+    loaNumber: string;
+  };
+
   tags: string[];
   createdAt: string;
   updatedAt: string;

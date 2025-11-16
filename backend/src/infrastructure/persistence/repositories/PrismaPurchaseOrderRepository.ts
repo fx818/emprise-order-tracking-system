@@ -12,6 +12,7 @@ export class PrismaPurchaseOrderRepository {
       id: prismaOrder.id,
       poNumber: prismaOrder.poNumber,
       loa: prismaOrder.loa,
+      loaNumber: prismaOrder.loaNumber,
       loaId: prismaOrder.loaId,
       vendor: prismaOrder.vendor,
       vendorId: prismaOrder.vendorId,

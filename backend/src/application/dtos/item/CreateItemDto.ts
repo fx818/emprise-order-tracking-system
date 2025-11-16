@@ -6,6 +6,11 @@ export interface CreateItemDto {
     unitPrice?: number;
     uom: string;    // Unit of Measurement
     hsnCode?: string;
+    vendors?: Array<{
+        vendorId: string;
+        unitPrice: number;
+    }>;
+
     // taxRates: TaxRates;
 }
 

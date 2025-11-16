@@ -24,6 +24,7 @@ export interface PDFItemData {
 export interface PDFGenerationData {
   id: string;
   poNumber: string;
+  loaNumber: string;
   vendor: {
     name: string;
     email: string;
@@ -247,6 +248,8 @@ export class POPDFService {
       }
 
       const templateContent = await fs.readFile(this.templatePath, 'utf-8');
+
+      console.log('Template content loaded successfully.');
       
       // Process data before template compilation
       const processedData = this.processTemplateData(data);
@@ -254,7 +257,9 @@ export class POPDFService {
       // Compile template
       try {
         const template = handlebars.compile(templateContent);
-        return template(processedData);
+        const result = template(processedData);
+        console.log('Template compiled successfully.', result);
+        return result;
       } catch (compileError: any) {
         console.error('Template compilation error:', compileError);
         console.error('Data causing compilation error:', JSON.stringify(processedData, null, 2));
@@ -314,6 +319,7 @@ export class POPDFService {
       const hash = createHash('sha256').update(pdfBuffer).digest('hex');
       const fileName = `purchase-orders/${data.poNumber}_${Date.now()}.pdf`;
       const url = await this.s3Service.uploadFile(fileName, pdfBuffer, 'application/pdf');
+      console.log("url is ", url);
       return { url, hash };
     } catch (error) {
       console.error('PDF Generation Error:', error);

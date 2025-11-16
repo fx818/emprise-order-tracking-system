@@ -20,6 +20,7 @@ const initialFormState: VendorFormData = {
   mobile: "",
   gstin: "",
   address: "",
+  remarks: "",
   bankDetails: {
     accountNumber: "",
     accountName: "",
@@ -52,6 +53,7 @@ export function VendorForm() {
           mobile: vendorData.mobile,
           gstin: vendorData.gstin || "",
           address: vendorData.address,
+          remarks: vendorData.remarks || "",
           bankDetails: {
             accountNumber: vendorData.bankDetails?.accountNumber || "",
             accountName: vendorData.bankDetails?.accountName || "",
@@ -246,6 +248,16 @@ export function VendorForm() {
                     value={formData.gstin || ""}
                     onChange={handleInputChange}
                     placeholder="Enter GSTIN"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Remarks</label>
+                  <Input
+                    name="remarks"
+                    value={formData.remarks || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter remarks"
                     disabled={loading}
                   />
                 </div>

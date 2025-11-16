@@ -3,7 +3,7 @@ import { CreateVendorItemDto, UpdateVendorItemDto } from '../../../application/d
 import { VendorItem } from '../../../domain/entities/VendorItem';
 
 export class PrismaVendorItemRepository {
-    constructor(private prisma: PrismaClient) {}
+    constructor(private prisma: PrismaClient) { }
 
     private transformToEntity(prismaVendorItem: any): VendorItem {
         return {
@@ -115,6 +115,13 @@ export class PrismaVendorItemRepository {
             throw error;
         }
     }
+
+    async deleteByItemId(itemId: string) {
+        return this.prisma.vendorItem.deleteMany({
+            where: { itemId }
+        });
+    }
+
 
     async findByVendorAndItem(vendorId: string, itemId: string): Promise<VendorItem | null> {
         const prismaVendorItem = await this.prisma.vendorItem.findUnique({

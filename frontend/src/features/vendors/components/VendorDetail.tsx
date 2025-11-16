@@ -25,12 +25,35 @@ import apiClient from "../../../lib/utils/api-client";
 import { DataTable } from "../../../components/data-display/DataTable";
 import { LoadingSpinner } from "../../../components/feedback/LoadingSpinner";
 
+import { useVendors } from "../hooks/use-vendors";
+
+
+
 export function VendorDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showError } = useToast();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [loading, setLoading] = useState(true);
+  const { deleteVendor } = useVendors();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteVendor = async () => {
+    if (!id) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteVendor(id);
+      setIsDeleteDialogOpen(false);
+      navigate("/vendors");
+    } catch (err) {
+      console.error("Failed to delete vendor:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
 
   // Fetch vendor data and related information
   useEffect(() => {
@@ -67,17 +90,23 @@ export function VendorDetail() {
           <h1 className="text-2xl font-bold">{vendor?.name}</h1>
         </div>
         <div className="flex space-x-2">
-          <Button 
+          <Button
             onClick={() => navigate(`/vendors/${id}/items`)}
             variant="outline"
           >
             <Package className="h-4 w-4 mr-2" />
             Manage Items
           </Button>
-          <Button 
+          <Button
             onClick={() => navigate(`/vendors/${id}/edit`)}
           >
             Edit Vendor
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
+            Delete
           </Button>
         </div>
       </div>
@@ -162,12 +191,12 @@ export function VendorDetail() {
                         </div>
                       </div>
                       <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/items/${item.itemId}`)}
-                        >
-                          View Details
-                        </Button>
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/items/${item.itemId}`)}
+                      >
+                        View Details
+                      </Button>
                       {/* */}
                     </div>
                   </div>
@@ -211,8 +240,8 @@ export function VendorDetail() {
                           row.status === 'COMPLETED'
                             ? 'default'
                             : row.status === 'CANCELLED'
-                            ? 'destructive'
-                            : 'default'
+                              ? 'destructive'
+                              : 'default'
                         }
                       >
                         {row.status}
@@ -252,6 +281,12 @@ export function VendorDetail() {
                   <div className="mt-1">{vendor.gstin || 'Not provided'}</div>
                 </div>
               </CardContent>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="text-sm font-medium">Remarks</div>
+                  <div className="mt-1">{vendor.remarks || 'Not provided'}</div>
+                </div>
+              </CardContent>
             </Card>
 
             {/* Bank Details */}
@@ -283,6 +318,36 @@ export function VendorDetail() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      {isDeleteDialogOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg space-y-4 max-w-sm w-full">
+            <h2 className="font-semibold text-lg">Delete Vendor?</h2>
+            <p className="text-sm text-muted-foreground">
+              This action cannot be undone. All vendor-related data will remain linked historically.
+            </p>
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                variant="destructive"
+                disabled={isDeleting}
+                onClick={handleDeleteVendor}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }

@@ -13,6 +13,7 @@ export class PrismaVendorRepository {
             mobile: prismaVendor.mobile,
             gstin: prismaVendor.gstin,
             address: prismaVendor.address,
+            remarks: prismaVendor.remarks,
             bankDetails: prismaVendor.bankDetails as BankDetails,
             items: prismaVendor.items,
             purchaseOrders: prismaVendor.purchaseOrders,
@@ -28,6 +29,7 @@ export class PrismaVendorRepository {
             mobile: data.mobile,
             gstin: data.gstin,
             address: data.address,
+            remarks: data.remarks,
             bankDetails: data.bankDetails as unknown as Prisma.InputJsonValue
         };
     }
@@ -40,6 +42,7 @@ export class PrismaVendorRepository {
         if (data.mobile !== undefined) updateData.mobile = data.mobile;
         if (data.gstin !== undefined) updateData.gstin = data.gstin;
         if (data.address !== undefined) updateData.address = data.address;
+        if (data.remarks !== undefined) updateData.remarks = data.remarks;
         if (data.bankDetails !== undefined) {
             updateData.bankDetails = data.bankDetails as unknown as Prisma.InputJsonValue;
         }

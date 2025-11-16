@@ -23,7 +23,7 @@ export function usePurchaseOrders() {
       return response.data;
     } catch (error: any) {
       console.error('PO creation error:', error.response || error); // Detailed error log
-      
+
       // Handle specific error cases
       if (error.response?.status === 400) {
         showError('Invalid data provided. Please check your inputs.');
@@ -34,7 +34,7 @@ export function usePurchaseOrders() {
       } else {
         showError(error.response?.data?.message || 'Failed to create purchase order');
       }
-      
+
       throw error;
     } finally {
       setLoading(false);
@@ -46,48 +46,61 @@ export function usePurchaseOrders() {
       setLoading(true);
 
       const response = await apiClient.post(`/purchase-orders/${id}/submit`);
-      
+
       // Check for business logic errors in success response
       if (response.data?.data?.isSuccess === false) {
         throw new Error(response.data.data.error || 'Failed to submit purchase order');
       }
-      
+
       // Check for API errors
       if (!response.data || response.data.status !== 'success') {
         throw new Error(response.data?.message || 'Failed to submit purchase order');
       }
-      
+
       showSuccess('Purchase order submitted for approval');
       return response.data;
     } catch (error: any) {
       console.error('Submit for approval error:', error);
-      
+
       // Handle specific error messages
-      const errorMessage = error.response?.data?.data?.error || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          'Failed to submit purchase order';
-                          
+      const errorMessage = error.response?.data?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to submit purchase order';
+
       showError(errorMessage);
       throw error;
     } finally {
       setLoading(false);
     }
   };
-
   const markAsCompleted = async (id: string) => {
     try {
       setLoading(true);
+
       const response = await apiClient.patch(`/purchase-orders/${id}/status`, { status: 'COMPLETED' });
-      
-      if (!response.data || response.data.status !== 'success') {
-        throw new Error(response.data?.message || 'Failed to update purchase order status');
+      console.log("Mark as completed response:", response);
+
+      const api = response.data;
+
+      // 🔍 Validate real business success, not just HTTP success
+      if (!api || api.status !== 'success') {
+        throw new Error(api?.message || "Unexpected API response");
       }
-      
-      showSuccess('Purchase order marked as completed');
+
+      // Some APIs wrap data like { status, data: { isSuccess, error } }
+      const business = api.data;
+
+      if (business?.isSuccess === false) {
+        throw new Error(business?.error || "Action not allowed");
+      }
+
+      showSuccess("Purchase order marked as completed");
+      return business;
+
     } catch (error: any) {
-      console.error('Mark as completed error:', error.response || error);
-      showError(error.response?.data?.message || 'Failed to update purchase order status');
+      console.error("Mark as completed error:", error);
+      showError(error?.message || error?.response?.data?.message || "Failed to update status");
       throw error;
     } finally {
       setLoading(false);
@@ -156,11 +169,11 @@ export function usePurchaseOrders() {
     try {
       setLoading(true);
       const response = await apiClient.get(`/purchase-orders/${id}`);
-      
+
       if (!response.data || response.data.status !== 'success') {
         throw new Error(response.data?.message || 'Failed to fetch purchase order');
       }
-      
+
       return response.data?.data?.data;
     } catch (error: any) {
       console.error('Get PO error:', error.response || error);
@@ -196,11 +209,11 @@ export function usePurchaseOrders() {
     try {
       setLoading(true);
       const response = await apiClient.delete(`/purchase-orders/${id}`);
-      
+
       if (!response.data || response.data.status !== 'success') {
         throw new Error(response.data?.message || 'Failed to delete purchase order');
       }
-      
+
       showSuccess('Purchase order deleted successfully');
     } catch (error: any) {
       console.error('Delete PO error:', error.response || error);

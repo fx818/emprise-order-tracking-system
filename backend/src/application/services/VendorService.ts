@@ -13,6 +13,8 @@ export class VendorService {
 
   async createVendor(dto: CreateVendorDto): Promise<Result<any>> {
     try {
+
+      console.log("before dto is ", dto)
       const validationResult = this.validator.validate(dto);
       if (!validationResult.isSuccess) {
         return ResultUtils.fail('Validation processing failed');
@@ -21,7 +23,7 @@ export class VendorService {
       if (validationResult.data && validationResult.data.length > 0) {
         return ResultUtils.fail('Validation failed', validationResult.data);
       }
-
+      console.log("the dto is ", dto);
       const vendor = await this.repository.create(dto);
       return ResultUtils.ok(vendor);
     } catch (error) {
@@ -54,21 +56,56 @@ export class VendorService {
       throw new AppError(`Failed to update vendor. ${message}`);
     }
   }
-
   async deleteVendor(id: string): Promise<Result<void>> {
     try {
+      // 1️⃣ Check existence
       const vendor = await this.repository.findById(id);
       if (!vendor) {
-        return ResultUtils.fail('Vendor not found');
+        return ResultUtils.fail('The selected vendor does not exist or may have already been deleted.');
       }
 
-      await this.repository.delete(id);
+      // 2️⃣ Attempt deletion
+      try {
+        await this.repository.delete(id);
+      } catch (dbError: any) {
+        console.error("❌ Vendor DB deletion error:", dbError);
+
+        // Prisma error: https://www.prisma.io/docs/reference/api-reference/error-reference
+        if (dbError.code === "P2003") {
+          // Foreign key constraint violation – vendor is used somewhere
+          return ResultUtils.fail(
+            "This vendor cannot be deleted because it is linked to other records (purchase orders, items, etc.). Remove dependencies first."
+          );
+        }
+
+        if (dbError.code === "P2025") {
+          // Record not found during deletion
+          return ResultUtils.fail(
+            "Vendor not found. It may have already been deleted."
+          );
+        }
+
+        // Unknown DB failure
+        return ResultUtils.fail(
+          `Database error occurred while deleting vendor. Please retry.`
+        );
+      }
+
+      // 3️⃣ Successful deletion
       return ResultUtils.ok(undefined);
-    } catch (error) {
-      const message = error instanceof Error
-        ? error.message
-        : (typeof error === 'string' ? error : 'Failed to delete vendor');
-      throw new AppError(`Failed to delete vendor. ${message}`);
+
+    } catch (error: any) {
+      console.error("🔥 Unexpected Vendor Deletion Failure:", {
+        vendorId: id,
+        errorMessage: error?.message || error,
+        stack: error?.stack,
+      });
+
+      // Throw clean AppError (NOT raw error)
+      throw new AppError(
+        "An unexpected system error occurred while processing vendor deletion. Please try again or contact support.",
+        500
+      );
     }
   }
 

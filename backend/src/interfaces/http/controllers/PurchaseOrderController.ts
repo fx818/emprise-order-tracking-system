@@ -55,7 +55,7 @@ export class PurchaseOrderController {
     }
   };
 
-  deletePurchaseOrder = async (req: Request, res: Response) => {
+  deletePurchaseOrder = async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = req.user?.userId;
       if (!userId) {
@@ -65,14 +65,16 @@ export class PurchaseOrderController {
       const { id } = req.params;
       await this.service.deletePurchaseOrder(id, userId);
 
-      res.status(204).send();
-    } catch (error) {
+      res.status(204).send(); // no return
+    } catch (error: any) {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Failed to delete purchase order');
+
+      throw new AppError(error.message || 'Failed to delete purchase order');
     }
   };
+
 
   getPurchaseOrder = async (req: Request, res: Response) => {
     try {
@@ -137,12 +139,12 @@ export class PurchaseOrderController {
       if (!userId) {
         throw new AppError('User ID not found', 401);
       }
-
+      console.log("🔥 UPDATE STATUS REQ BODY:", req.body);
       const { id } = req.params;
       const { status } = req.body;
 
       const updatedPO = await this.service.updateStatus(id, status, userId);
-
+      console.log("🔥 UPDATED PO AFTER STATUS CHANGE:", updatedPO);
       res.json({
         status: 'success',
         data: updatedPO
@@ -151,7 +153,7 @@ export class PurchaseOrderController {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Failed to update purchase order status');
+      throw new AppError('Failed to update purchase order status here');
     }
   };
 
@@ -163,7 +165,11 @@ export class PurchaseOrderController {
       }
 
       const { id } = req.params;
-      const result = await this.service.generatePDF(id);
+      // 🔥 Extract the correct override payload
+      const overrides = req.body?.overrides ?? req.body ?? {};
+
+      console.log("🔥 FINAL OVERRIDES SENT TO SERVICE:", overrides);
+      const result = await this.service.generatePDF(id, overrides);
 
       if (!result.isSuccess) {
         const errorMessage = Array.isArray(result.error)
@@ -239,7 +245,7 @@ export class PurchaseOrderController {
 
       const { id } = req.params;
       const { comments } = req.body;
-      
+
       const result = await this.service.approveOrder(id, userId, comments);
       res.json({
         status: 'success',
@@ -285,7 +291,7 @@ export class PurchaseOrderController {
         'Content-Security-Policy',
         "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
       );
-  
+
       // If no comments provided, show the approval form
       if (!comments) {
         res.send(`
@@ -401,7 +407,7 @@ export class PurchaseOrderController {
       }
 
       const result = await this.service.handleEmailApproval(token, comments as string);
-  
+
       if (!result.isSuccess) {
         res.send(`
           <html>
@@ -413,7 +419,7 @@ export class PurchaseOrderController {
         `);
         return;
       }
-  
+
       res.send(`
         <html>
           <body style="font-family: Arial, sans-serif; text-align: center; padding-top: 50px;">
@@ -433,12 +439,12 @@ export class PurchaseOrderController {
     try {
       const { token } = req.params;
       const { reason } = req.query;
-  
+
       res.setHeader(
         'Content-Security-Policy',
         "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
       );
-  
+
       // If no reason provided, show the rejection form
       if (!reason) {
         res.send(`
@@ -558,9 +564,9 @@ export class PurchaseOrderController {
         `);
         return;
       }
-  
+
       const result = await this.service.handleEmailRejection(token, reason as string);
-  
+
       if (!result.isSuccess) {
         res.send(`
           <html>
@@ -572,7 +578,7 @@ export class PurchaseOrderController {
         `);
         return;
       }
-  
+
       res.send(`
         <html>
           <body style="font-family: Arial, sans-serif; text-align: center; padding-top: 50px;">
@@ -587,4 +593,34 @@ export class PurchaseOrderController {
       res.status(500).send('An error occurred');
     }
   };
+
+
+  updateDocumentFields = async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const result = await this.service.updateDocumentFields(id, req.body);
+
+      if (!result.isSuccess) {
+        const message = Array.isArray(result.error)
+          ? result.error.map(e => e.message).join(", ")
+          : result.error;
+
+        throw new AppError(message || "Failed to update document fields");
+      }
+
+
+      res.json({
+        status: "success",
+        data: result.data
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Failed to update document fields");
+    }
+  };
+
+
+
+
 }

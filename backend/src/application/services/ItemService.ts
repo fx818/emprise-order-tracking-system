@@ -3,11 +3,16 @@ import { CreateItemDto, UpdateItemDto } from '../dtos/item/CreateItemDto';
 import { ItemValidator } from '../validators/item.validator';
 import { Result, ResultUtils } from '../../shared/types/common.types';
 import { AppError } from '../../shared/errors/AppError';
+import { PrismaVendorItemRepository } from '../../infrastructure/persistence/repositories/PrismaVendorItemRepository';
+
 
 export class ItemService {
   private validator: ItemValidator;
 
-  constructor(private repository: PrismaItemRepository) {
+  constructor(
+    private repository: PrismaItemRepository,
+    private vendorItemRepository: PrismaVendorItemRepository
+  ) {
     this.validator = new ItemValidator();
   }
 
@@ -23,6 +28,18 @@ export class ItemService {
       }
       console.log('Creating item with DTO:', dto);
       const item = await this.repository.create(dto);
+
+      if (dto.vendors && dto.vendors?.length > 0) {
+        for (const vendor of dto.vendors) {
+          await this.vendorItemRepository.create({
+            vendorId: vendor.vendorId,
+            itemId: item.id,
+            unitPrice: vendor.unitPrice
+          });
+        }
+      }
+      console.log('Created Item:', dto);
+
       return ResultUtils.ok(item);
     } catch (error) {
       const message = error instanceof Error
@@ -104,15 +121,29 @@ export class ItemService {
     try {
       const item = await this.repository.findById(id);
       if (!item) {
-        return ResultUtils.fail('Item not found');
+        return ResultUtils.fail("Item not found");
       }
 
+      // 1️⃣ Delete vendor-item relations first
+      await this.vendorItemRepository.deleteByItemId(id);
+
+      // 2️⃣ Now delete the item
       await this.repository.delete(id);
+
       return ResultUtils.ok(undefined);
-    } catch (error) {
-      throw new AppError('Failed to delete item');
+    } catch (error: any) {
+      if (error.code === "P2003") {
+        // Prisma foreign key constraint error
+        throw new AppError(
+          "Cannot delete this item because it is used in purchase orders."
+        );
+      }
+
+      throw new AppError(`Failed to delete item heere. ${error.message}`);
     }
+
   }
+
 
   async getItem(id: string): Promise<Result<any>> {
     try {

@@ -11,7 +11,8 @@ import { User, LogOut, ChevronLeft, ChevronRight, Moon, Sun } from 'lucide-react
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../lib/stores/auth-store';
 import { useTheme } from '../../context/ThemeProvider';
-import empriseLogo from '../../assets/empriseLogo.png';
+// import empriseLogo from '../../assets/empriseLogo.png';
+import empriseLogo from '../../assets/emprise.jpeg';
 
 export const Header = ({ collapsed, setCollapsed }: { collapsed: boolean; setCollapsed: (value: boolean) => void }) => {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ export const Header = ({ collapsed, setCollapsed }: { collapsed: boolean; setCol
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </Button>
         <a href="/" className="mr-6 flex items-center space-x-2">
-          <img src={empriseLogo} alt="Emprise Marketing Logo" className="h-8" />
+          <img src={empriseLogo} alt="Emprise UNIVORA Logo" className="h-8" />
         </a>
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
           <div className="w-full flex-1 md:w-auto md:flex-none">

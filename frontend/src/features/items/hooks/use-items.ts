@@ -27,19 +27,30 @@ export function useItems() {
       throw error;
     }
   }, [showError]);
-
   const createItem = useCallback(async (data: ItemFormData) => {
     try {
-      const response = await apiClient.post('/items', {
-        ...data,
-        unitPrice: 0
-      });
+      setLoading(true);
+
+      const payload = {
+        name: data.name,
+        description: data.description,
+        uom: data.uom,
+        hsnCode: data.hsnCode,
+        vendors: data.vendors || [],   // ✅ IMPORTANT
+      };
+
+      const response = await apiClient.post("/items", payload);
+
+      showSuccess("Item created successfully");
       return response.data.data;
     } catch (error: any) {
-      showError(error.response?.data?.message || 'Failed to create item');
+      showError(error.response?.data?.message || "Failed to create item");
       throw error;
+    } finally {
+      setLoading(false);
     }
-  }, [showError]);
+  }, [showSuccess, showError]);
+
 
   // const createItem = useCallback(async (data: ItemFormData) => {
   //   try {
@@ -87,23 +98,40 @@ export function useItems() {
       throw error;
     }
   }, [showError]);
-
   const deleteItem = useCallback(async (id: string) => {
     try {
       setLoading(true);
+
       await apiClient.delete(`/items/${id}`);
-      // If the delete request doesn't throw an error, consider it successful
-      showSuccess('Item deleted successfully');
+
+      showSuccess("Item deleted successfully");
       return true;
 
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to delete item';
-      showError(errorMessage);
+      let msg = "Failed to delete item";
+      console.log("Delete Item Error:", error.response.data.message);
+      // Backend AppError returns: { message: "..." }
+      if (error.response.data.message) {
+        msg = error.response.data.message;
+      }
+
+      // Prisma FK error message from backend
+      if (
+        msg.includes("purchase orders") ||
+        msg.includes("P2003")
+      ) {
+        msg =
+          "This item cannot be deleted because it is already used in purchase orders.";
+      }
+
+      showError(msg);
       return false;
+
     } finally {
       setLoading(false);
     }
   }, [showSuccess, showError]);
+
 
   const addVendor = useCallback(async (itemId: string, data: { vendorId: string; unitPrice: number }) => {
     try {

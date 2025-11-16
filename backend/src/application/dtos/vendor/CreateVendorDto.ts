@@ -12,6 +12,7 @@ export interface CreateVendorDto {
     mobile: string;
     gstin?: string;
     address: string;
+    remarks?: string;
     bankDetails: BankDetails;
 }
 

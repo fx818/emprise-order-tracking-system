@@ -30,7 +30,7 @@ export class PurchaseOrderService {
   ) {
     this.validator = new PurchaseOrderValidator();
   }
-  
+
   async createPurchaseOrder(dto: CreatePurchaseOrderDto, userId: string): Promise<Result<any>> {
     try {
 
@@ -108,6 +108,23 @@ export class PurchaseOrderService {
         tags: dto.tags || []
       });
 
+      // Generate PDF after admin auto-approval
+      const pdfResult = await this.generatePDF(po.id);
+      if (!pdfResult.isSuccess || !pdfResult.data) {
+        console.error('PDF generation failed:', {
+          error: pdfResult.error,
+          isSuccess: pdfResult.isSuccess,
+          hasData: !!pdfResult.data
+        });
+        return ResultUtils.fail(`Failed to generate approved document: ${pdfResult.error || 'Unknown error'}`);
+      }
+
+      // Update PO with the generated PDF URL and hash
+      await this.repository.update(po.id, {
+        documentUrl: pdfResult.data.url,
+        documentHash: pdfResult.data.hash
+      });
+
       return ResultUtils.ok(po);
     } catch (error) {
       console.error('PO Creation Error:', error);
@@ -162,7 +179,7 @@ export class PurchaseOrderService {
         const baseAmount = dto.baseAmount ?? currentPO.baseAmount;
         const taxAmount = dto.taxAmount ?? currentPO.taxAmount;
         const additionalCharges = dto.additionalCharges ?? currentPO.additionalCharges;
-        
+
         const additionalChargesTotal = additionalCharges.reduce((total, charge) => {
           return total + charge.amount;
         }, 0);
@@ -182,35 +199,74 @@ export class PurchaseOrderService {
       throw new AppError('Failed to update purchase order');
     }
   }
-
-  async deletePurchaseOrder(id: string, userId: string): Promise<Result<void>> {
+  async deletePurchaseOrder(id: string, userId: string): Promise<void> {
     try {
+      // 1️⃣ Validate existence
       const po = await this.repository.findById(id);
       if (!po) {
-        return ResultUtils.fail('Purchase order not found');
+        throw new AppError('The requested purchase order does not exist or may have already been deleted.', 404);
       }
 
-      // Only creator can delete
+      // 2️⃣ Permission check
       if (po.createdById !== userId) {
-        return ResultUtils.fail('You do not have permission to delete this purchase order');
+        throw new AppError('You do not have permission to delete this purchase order. Only the creator can delete it.', 403);
       }
 
-      // Can't delete if already approved
+      // 3️⃣ Cannot delete approved PO
       if (po.status === POStatus.APPROVED) {
-        return ResultUtils.fail('Cannot delete approved purchase order');
+        throw new AppError('This purchase order has already been approved and cannot be deleted.', 400);
       }
 
-      // Delete document if exists
+      // 4️⃣ Attempt to delete related file if exists
       if (po.documentUrl) {
-        const fileKey = this.extractFileKeyFromUrl(po.documentUrl);
-        await this.storageService.deleteFile(fileKey);
+        try {
+          const fileKey = this.extractFileKeyFromUrl(po.documentUrl);
+          await this.storageService.deleteFile(fileKey);
+        } catch (fileErr: any) {
+          console.error('❌ Storage deletion failed:', { error: fileErr });
+          throw new AppError('Failed to remove the attached document from storage. Please try again.', 500);
+        }
       }
 
-      await this.repository.delete(id);
-      return ResultUtils.ok(undefined);
-    } catch (error) {
-      console.error('PO Deletion Error:', error);
-      throw new AppError('Failed to delete purchase order');
+      // 5️⃣ Attempt DB deletion
+      try {
+        await this.repository.delete(id);
+      } catch (dbErr: any) {
+        console.error('❌ Database deletion error:', dbErr);
+
+        const msg = dbErr?.message?.toLowerCase() || '';
+
+        if (msg.includes('foreign key') || msg.includes('constraint')) {
+          throw new AppError(
+            'This purchase order has related items or linked records and cannot be deleted. Remove dependent data first.',
+            409
+          );
+        }
+
+        throw new AppError(
+          'Failed to delete the purchase order due to a database error. Please try again.',
+          500
+        );
+      }
+
+    } catch (error: any) {
+
+      // if error is already AppError, forward it
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      // unexpected — convert to safe AppError
+      console.error('🔥 Unexpected deletion failure:', {
+        poId: id,
+        userId,
+        error: error?.message || error
+      });
+
+      throw new AppError(
+        'An unexpected error occurred while deleting the purchase order. Please retry or contact support.',
+        500
+      );
     }
   }
 
@@ -275,12 +331,15 @@ export class PurchaseOrderService {
   async updateStatus(id: string, status: POStatus, userId: string): Promise<Result<any>> {
     try {
       const po = await this.repository.findById(id);
+      console.log("the purchase order is", po);
       if (!po) {
         return ResultUtils.fail('Purchase order not found');
       }
 
       // Only approver can change status
-      if (po.approverId !== userId) {
+      // added the approver from history incase the po.approverId is null
+      const approver = po.approverId || po.approvalHistory[0].userId
+      if (po.approvalHistory && approver !== userId) {
         return ResultUtils.fail('You do not have permission to change the status');
       }
 
@@ -310,85 +369,217 @@ export class PurchaseOrderService {
     }
   }
 
-  async generatePDF(id: string): Promise<Result<{ url: string; hash: string }>> {
+  // async generatePDF(id: string): Promise<Result<{ url: string; hash: string }>> {
+  //   try {
+  //     const po = await this.repository.findById(id);
+  //     if (!po) {
+  //       return ResultUtils.fail('Purchase order not found');
+  //     }
+
+  //     if (!po.createdBy) {
+  //       return ResultUtils.fail('Creator details not found');
+  //     }
+
+  //     const documentData: PDFGenerationData = {
+  //       id: po.id,
+  //       poNumber: po.poNumber,
+  //       loaNumber: po.loaId ? (await this.loaRepository.findById(po.loaId))?.loaNumber || '' : '',
+  //       createdAt: po.createdAt,
+  //       totalAmount: po.totalAmount,
+  //       vendor: {
+  //         name: po.vendor.name,
+  //         email: po.vendor.email,
+  //         address: po.vendor.address,
+  //         gstin: po.vendor.gstin || '',
+  //         mobile: po.vendor.mobile || ''
+  //       },
+  //       additionalCharges: po.additionalCharges,
+  //       items: po.items.map(item => ({
+  //         id: item.id,
+  //         item: {
+  //           id: item.item.id,
+  //           name: item.item.name || '',
+  //           description: item.item.description || '',
+  //           unitPrice: item.unitPrice,
+  //           uom: item.item.uom || '',
+  //           hsnCode: item.item.hsnCode || ''
+  //         },
+  //         quantity: item.quantity,
+  //         unitPrice: item.unitPrice,
+  //         totalAmount: item.totalAmount
+  //       })),
+  //       requirementDesc: po.requirementDesc,
+  //       termsConditions: po.termsConditions,
+  //       shipToAddress: po.shipToAddress,
+  //       notes: po.notes || '',
+  //       baseAmount: po.baseAmount,
+  //       taxAmount: po.taxAmount,
+  //       createdBy: {
+  //         name: po.createdBy.name,
+  //         department: po.createdBy.department || 'N/A',
+  //       }
+  //     };
+
+  //     try {
+  //       const { url, hash } = await this.pdfService.generateAndUploadPurchaseOrder(documentData);
+
+  //       // Update PO with document URL and hash
+  //       const updatedPo = await this.repository.update(id, {
+  //         documentUrl: url,
+  //         documentHash: hash
+  //       });
+
+  //       if (!updatedPo) {
+  //         return ResultUtils.fail('Failed to update purchase order with document details');
+  //       }
+
+  //       return ResultUtils.ok({ url, hash });
+  //     } catch (pdfError: any) {
+  //       console.error('PDF generation error:', pdfError);
+  //       console.error('Error details:', {
+  //         message: pdfError.message,
+  //         stack: pdfError.stack,
+  //         name: pdfError.name
+  //       });
+  //       return ResultUtils.fail(`Failed to generate PDF: ${pdfError.message}`);
+  //     }
+  //   } catch (error) {
+  //     console.error('PDF Generation Error:', error);
+  //     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+  //     return ResultUtils.fail('Failed to generate PDF: ' + errorMessage);
+  //   }
+  // }
+
+  async generatePDF(id: string, overrides: any = {}): Promise<Result<{ url: string; hash: string }>> {
     try {
       const po = await this.repository.findById(id);
-      if (!po) {
-        return ResultUtils.fail('Purchase order not found');
-      }
+      if (!po) return ResultUtils.fail("Purchase order not found");
+      if (!po.createdBy) return ResultUtils.fail("Creator details not found");
 
-      if (!po.createdBy) {
-        return ResultUtils.fail('Creator details not found');
-      }
-
+      // ----------------------------
+      // Build Base PDF Data
+      // ----------------------------
       const documentData: PDFGenerationData = {
         id: po.id,
         poNumber: po.poNumber,
+        loaNumber: po.loaId ? (await this.loaRepository.findById(po.loaId))?.loaNumber || "" : "",
         createdAt: po.createdAt,
         totalAmount: po.totalAmount,
         vendor: {
           name: po.vendor.name,
           email: po.vendor.email,
           address: po.vendor.address,
-          gstin: po.vendor.gstin || '',
-          mobile: po.vendor.mobile || ''
+          gstin: po.vendor.gstin || "",
+          mobile: po.vendor.mobile || "",
         },
         additionalCharges: po.additionalCharges,
-        items: po.items.map(item => ({
+        items: po.items.map((item) => ({
           id: item.id,
           item: {
             id: item.item.id,
-            name: item.item.name || '',
-            description: item.item.description || '',
+            name: item.item.name || "",
+            description: item.item.description || "",
             unitPrice: item.unitPrice,
-            uom: item.item.uom || '',
-            hsnCode: item.item.hsnCode || ''
+            uom: item.item.uom || "",
+            hsnCode: item.item.hsnCode || "",
           },
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          totalAmount: item.totalAmount
+          totalAmount: item.totalAmount,
         })),
         requirementDesc: po.requirementDesc,
         termsConditions: po.termsConditions,
         shipToAddress: po.shipToAddress,
-        notes: po.notes || '',
+        notes: po.notes || "",
         baseAmount: po.baseAmount,
         taxAmount: po.taxAmount,
         createdBy: {
           name: po.createdBy.name,
-          department: po.createdBy.department || 'N/A',
-        }
+          department: po.createdBy.department || "N/A",
+        },
       };
 
-      try {
-        const { url, hash } = await this.pdfService.generateAndUploadPurchaseOrder(documentData);
+      console.log("🟡 DATA BEFORE MERGE:", documentData);
 
-        // Update PO with document URL and hash
-        const updatedPo = await this.repository.update(id, {
-          documentUrl: url,
-          documentHash: hash
-        });
+      // ----------------------------
+      // Apply Overrides Correctly
+      // ----------------------------
+      const finalData: PDFGenerationData = {
+        ...documentData,
 
-        if (!updatedPo) {
-          return ResultUtils.fail('Failed to update purchase order with document details');
-        }
+        // TEXT
+        requirementDesc: overrides.requirementDesc ?? documentData.requirementDesc,
+        termsConditions: overrides.termsConditions ?? documentData.termsConditions,
+        notes: overrides.notes ?? documentData.notes,
+        shipToAddress: overrides.shipToAddress ?? documentData.shipToAddress,
 
-        return ResultUtils.ok({ url, hash });
-      } catch (pdfError: any) {
-        console.error('PDF generation error:', pdfError);
-        console.error('Error details:', {
-          message: pdfError.message,
-          stack: pdfError.stack,
-          name: pdfError.name
-        });
-        return ResultUtils.fail(`Failed to generate PDF: ${pdfError.message}`);
-      }
-    } catch (error) {
-      console.error('PDF Generation Error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      return ResultUtils.fail('Failed to generate PDF: ' + errorMessage);
+        // AMOUNTS
+        taxAmount: overrides.taxAmount ?? documentData.taxAmount,
+        totalAmount: overrides.totalAmount ?? (
+          overrides.baseAmount ?? documentData.baseAmount
+        ) + (
+            overrides.taxAmount ?? documentData.taxAmount
+          ) + (
+            (overrides.additionalCharges ?? documentData.additionalCharges)?.reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
+          ),
+
+        // Vendor
+        vendor: overrides.vendor ?? overrides.vendorOverride ?? documentData.vendor,
+
+        // Items
+        items: overrides.items ?? overrides.itemsOverride ?? documentData.items,
+
+        // Charges
+        additionalCharges: overrides.additionalCharges ?? overrides.chargesOverride ?? documentData.additionalCharges,
+      };
+
+
+      console.log("🟢 FINAL DATA SENT TO PDF:", finalData);
+
+      // ----------------------------
+      // Generate and Upload PDF
+      // ----------------------------
+      const { url, hash } = await this.pdfService.generateAndUploadPurchaseOrder(finalData);
+
+      const updatedPo = await this.repository.update(id, {
+        documentUrl: url,
+        documentHash: hash,
+      });
+
+      console.log("🟣 Updated PO:", updatedPo);
+      console.log("🔵 Generated PDF URL:", url);
+
+      return ResultUtils.ok({ url, hash });
+    } catch (err: any) {
+      console.error("❌ PDF Generation Error:", err);
+      return ResultUtils.fail(`Failed to generate PDF: ${err.message}`);
     }
   }
+
+
+  async updateDocumentFields(
+    id: string,
+    payload: {
+      requirementDesc: string;
+      termsConditions: string;
+      notes: string;
+      shipToAddress: string;
+    }
+  ): Promise<Result<any>> {
+    try {
+      const updated = await this.repository.update(id, payload);
+
+      if (!updated) {
+        return ResultUtils.fail("Failed to update document fields");
+      }
+
+      return ResultUtils.ok(updated);
+    } catch (error: any) {
+      return ResultUtils.fail(error.message || "Update failed");
+    }
+  }
+
+
 
   async verifyDocument(id: string): Promise<Result<{
     isValid: boolean;
@@ -490,6 +681,7 @@ export class PurchaseOrderService {
     return {
       id: po.id,
       poNumber: po.poNumber,
+      loaNumber: po.loaNumber || '',
       createdAt: po.createdAt,
       totalAmount: po.totalAmount,
       vendor: {
@@ -497,6 +689,7 @@ export class PurchaseOrderService {
         email: po.vendor.email,
         address: po.vendor.address,
         gstin: po.vendor.gstin || '',
+        remarks: po.vendor.remarks || '',
         mobile: po.vendor.mobile || ''
       },
       additionalCharges: po.additionalCharges,
@@ -723,15 +916,15 @@ export class PurchaseOrderService {
       if (!po) {
         return ResultUtils.fail('Purchase order not found');
       }
-  
+
       if (po.approverId && po.approverId !== userId) {
         return ResultUtils.fail('Only the assigned approver can reject this order');
       }
-  
+
       if (po.status !== POStatus.PENDING_APPROVAL) {
         return ResultUtils.fail('Only PENDING_APPROVAL orders can be rejected');
       }
-  
+
       const approvalAction: ApprovalAction = {
         actionType: 'REJECT',
         userId,
@@ -740,9 +933,9 @@ export class PurchaseOrderService {
         previousStatus: po.status,
         newStatus: POStatus.REJECTED
       };
-  
+
       const currentHistory = po.approvalHistory || [];
-  
+
       const updateData = {
         status: POStatus.REJECTED,
         approverId: userId,
@@ -750,9 +943,9 @@ export class PurchaseOrderService {
         rejectionReason: reason,  // Keep for backward compatibility if needed
         approvalHistory: [...currentHistory, approvalAction]
       };
-  
+
       const updatedPO = await this.repository.update(id, updateData);
-  
+
       // Send rejection email
       if (po.createdBy?.email) {
         try {
@@ -767,7 +960,7 @@ export class PurchaseOrderService {
           console.error('Failed to send rejection notification email:', emailError);
         }
       }
-  
+
       return ResultUtils.ok(updatedPO);
     } catch (error) {
       console.error('PO Rejection Error:', error);
@@ -792,15 +985,15 @@ export class PurchaseOrderService {
 
   async handleEmailRejection(token: string, reason: string): Promise<Result<PurchaseOrder>> {
     const tokenData = this.tokenService.verifyApprovalToken(token);
-    
+
     if (!tokenData) {
       return ResultUtils.fail('Invalid or expired rejection link');
     }
-  
+
     if (tokenData.action !== 'reject') {
       return ResultUtils.fail('Invalid action type');
     }
-  
+
     const rejectionResult = await this.rejectOrder(tokenData.poId, tokenData.userId, reason);
     return rejectionResult;
   }

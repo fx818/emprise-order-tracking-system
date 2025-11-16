@@ -40,7 +40,7 @@ export function PODetail() {
   const [order, setOrder] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const { submitForApproval, markAsCompleted, getPurchaseOrder } = usePurchaseOrders();
+  const { submitForApproval, markAsCompleted, getPurchaseOrder, deletePurchaseOrder } = usePurchaseOrders();
   const currentUser = getUser();
 
   // Fetch order details
@@ -104,18 +104,20 @@ export function PODetail() {
       maximumFractionDigits: 2
     })}`;
   };
-
-  // Handle status changes
   const handleStatusChange = async (action: "submit" | "complete") => {
+    if (!id) {
+      showError("Invalid Order ID");
+      return;
+    }
+
     try {
-      if (!id) throw new Error("No order ID provided");
-      
       setSubmitting(true);
-      
+
       if (action === "submit") {
         await submitForApproval(id);
+
         showSuccess(
-          currentUser?.role === 'ADMIN' 
+          currentUser?.role === "ADMIN"
             ? "Purchase order has been auto-approved"
             : "Purchase order submitted for approval successfully"
         );
@@ -124,16 +126,36 @@ export function PODetail() {
         showSuccess("Purchase order marked as completed");
       }
 
-      // Refresh order details
+      // Refresh order
       const updatedOrder = await getPurchaseOrder(id);
       setOrder(updatedOrder);
-    } catch (error) {
-      console.error(`Failed to ${action} order:`, error);
-      showError(`Failed to ${action} purchase order`);
+
+    } catch (err: unknown) {
+      console.error(`❌ Failed to ${action} order`, err);
+
+      // Normalize error
+      let message = "Unexpected error occurred";
+
+      if (typeof err === "string") {
+        message = err;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      // Axios / Fetch standard
+      else if ((err as any)?.response?.data?.message) {
+        message = (err as any).response.data.message;
+      }
+      else if ((err as any)?.message) {
+        message = (err as any).message;
+      }
+
+      showError(message);
+
     } finally {
       setSubmitting(false);
     }
   };
+
 
   return (
     <div className="space-y-6">
@@ -147,16 +169,18 @@ export function PODetail() {
           <StatusBadge status={order?.status || 'DRAFT'} />
         </div>
         <div className="flex space-x-4">
+
           {order?.status === "DRAFT" && (
             <>
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => navigate(`/purchase-orders/${id}/edit`)}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Order
               </Button>
-              <Button 
+
+              <Button
                 onClick={() => handleStatusChange("submit")}
                 disabled={submitting}
               >
@@ -172,10 +196,33 @@ export function PODetail() {
                   </>
                 )}
               </Button>
+
+              {/* 🗑️ Delete Button for DRAFT only */}
+              <Button
+                variant="destructive"
+                disabled={submitting}
+                onClick={async () => {
+                  const confirmed = window.confirm(
+                    "Are you sure you want to permanently delete this purchase order?"
+                  );
+                  if (!confirmed) return;
+
+                  try {
+                    await deletePurchaseOrder(id!);
+                    navigate("/purchase-orders");
+                  } catch (err) {
+                    console.error("Delete error:", err);
+                  }
+                }}
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
             </>
           )}
+
           {order?.status === "APPROVED" && (
-            <Button 
+            <Button
               onClick={() => handleStatusChange("complete")}
               disabled={submitting}
             >
@@ -193,6 +240,7 @@ export function PODetail() {
             </Button>
           )}
         </div>
+
       </div>
 
       {/* Add info message for admin users with draft orders */}
@@ -239,7 +287,7 @@ export function PODetail() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{order.loa.loaNumber}</div>
-            <button 
+            <button
               className="text-xs text-primary hover:underline"
               onClick={() => navigate(`/loas/${order.loa.id}`)}
             >
@@ -385,9 +433,9 @@ export function PODetail() {
                   <h3 className="text-sm font-medium text-muted-foreground">
                     Terms and Conditions
                   </h3>
-                  <div 
+                  <div
                     className="mt-1 prose prose-sm max-w-none [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:mt-2"
-                    dangerouslySetInnerHTML={{ 
+                    dangerouslySetInnerHTML={{
                       __html: order.termsConditions
                     }}
                   />
@@ -406,7 +454,7 @@ export function PODetail() {
               {/* Order Totals Section with Additional Charges */}
               <div className="border rounded-lg p-4">
                 <h3 className="font-medium mb-4">Order Summary</h3>
-                
+
                 <table className="w-full">
                   <tbody>
                     <tr className="text-sm">
@@ -547,8 +595,78 @@ export function PODetail() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* ALWAYS SHOW Document Section */}
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                  <div>
+                    <div className="font-medium">Purchase Order Document</div>
+
+                    {order.documentUrl ? (
+                      <div className="text-sm text-muted-foreground">
+                        Generated on {format(new Date(order.updatedAt), "PPP")}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground italic">
+                        Document will be available after approval.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ACTION BUTTONS */}
+                <div className="flex space-x-2">
+
+                  {/* VIEW DOCUMENT */}
+                  <Button
+                    variant="outline"
+                    disabled={!order.documentUrl}
+                    onClick={() =>
+                      order.documentUrl && window.open(order.documentUrl, "_blank")
+                    }
+                  >
+                    {order.documentUrl ? "View Document" : "Not Available"}
+                  </Button>
+
+                  {/* EDIT DOCUMENT */}
+                  <Button
+                    variant="outline"
+                    disabled={!order.documentUrl}
+                    onClick={() => navigate(`/purchase-orders/${order.id}/edit-documents`)}
+                  >
+                    Edit Document
+                  </Button>
+
+
+                </div>
+              </div>
+
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <FileCheck className="h-6 w-6 text-muted-foreground" />
+                  <div>
+                    <div className="font-medium">Associated LOA</div>
+                    <div className="text-sm text-muted-foreground">
+                      LOA Number: {order.loa.loaNumber}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+
+
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(`/loas/${order.loa.id}`)}
+                  >
+                    LOA Details
+                  </Button>
+                </div>
+              </div>
+
+              {/* 
               <div className="space-y-4">
-                {/* Purchase Order Document */}
+              
                 {order.documentUrl ? (
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
@@ -560,7 +678,7 @@ export function PODetail() {
                         </div>
                       </div>
                     </div>
-                    <Button 
+                    <Button
                       variant="outline"
                       onClick={() => order.documentUrl && window.open(order.documentUrl, '_blank')}
                     >
@@ -576,7 +694,7 @@ export function PODetail() {
                   </Alert>
                 )}
 
-                {/* Associated LOA Document */}
+                
                 {order.loa.documentUrl && (
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
@@ -589,13 +707,13 @@ export function PODetail() {
                       </div>
                     </div>
                     <div className="flex space-x-2">
-                      <Button 
+                      <Button
                         variant="outline"
                         onClick={() => order.loa.documentUrl && window.open(order.loa.documentUrl, '_blank')}
                       >
                         View LOA
                       </Button>
-                      <Button 
+                      <Button
                         variant="outline"
                         onClick={() => navigate(`/loas/${order.loa.id}`)}
                       >
@@ -604,7 +722,7 @@ export function PODetail() {
                     </div>
                   </div>
                 )}
-              </div>
+              </div> */}
             </CardContent>
           </Card>
         </TabsContent>

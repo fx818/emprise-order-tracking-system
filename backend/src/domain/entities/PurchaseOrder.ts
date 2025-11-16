@@ -11,6 +11,7 @@ export interface PurchaseOrder {
   poNumber: string;
   loa: LOA;
   loaId: string;
+  loaNumber: string;
   vendor: Vendor;
   vendorId: string;
   items: PurchaseOrderItem[];
@@ -62,6 +63,7 @@ export interface PDFItemData {
 export interface PDFGenerationData {
   id: string;
   poNumber: string;
+  loaNumber: string;
   createdAt: Date;
   totalAmount: number;
   vendor: {
@@ -70,6 +72,7 @@ export interface PDFGenerationData {
     mobile: string;
     gstin: string;
     address: string;
+    remarks?: string;
   };
   additionalCharges: Array<{
     description: string;

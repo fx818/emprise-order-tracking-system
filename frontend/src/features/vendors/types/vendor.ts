@@ -16,6 +16,7 @@ export const vendorSchema = z.object({
   mobile: z.string().min(10, "Mobile number must be 10 digits"),
   gstin: z.string().nullable().optional(),
   address: z.string().min(1, "Address is required"),
+  remarks: z.string().nullable().optional(),
   bankDetails: bankDetailsSchema
 });
 

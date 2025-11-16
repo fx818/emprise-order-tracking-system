@@ -26,10 +26,10 @@ import { LoadingSpinner } from "../../../components/feedback/LoadingSpinner";
 import { Alert, AlertDescription } from "../../../components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { DataTable } from "../../../components/data-display/DataTable";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogFooter,
   DialogDescription,
@@ -68,7 +68,7 @@ interface PriceHistoryData {
 export function ItemDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { showError, showSuccess } = useToast();
+  const { showError } = useToast();
   const [item, setItem] = useState<Item | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedVendor, setSelectedVendor] = useState<ItemVendor | null>(null);
@@ -84,7 +84,7 @@ export function ItemDetail() {
 
     async function loadItem() {
       if (!id) return;
-      
+
       try {
         setIsLoading(true);
         const data = await getItem(id);
@@ -104,7 +104,7 @@ export function ItemDetail() {
   useEffect(() => {
     const fetchAllVendorsPriceHistory = async () => {
       if (!item?.id || !item.vendors.length) return;
-      
+
       try {
         const histories = await Promise.all(
           item.vendors.map(async (vendor) => {
@@ -161,28 +161,38 @@ export function ItemDetail() {
       setIsLoading(false);
     }
   };
-
   const handleDeleteItem = async () => {
     if (!id) return;
-    
+
     try {
       setIsLoading(true);
+
       const success = await deleteItem(id);
-      
+
       if (success) {
-        showSuccess("Item deleted successfully");
+        // deleteItem already shows a success toast
         setShowDeleteDialog(false);
         navigate("/items", { replace: true });
-      } else {
-        showError("Failed to delete item");
+        return;
       }
-    } catch (error) {
-      console.error('Delete error:', error);
-      showError("Failed to delete item");
+
+      // deleteItem returned false → It already showed an error toast.
+      // No need to show additional toasts.
+
+    } catch (error: any) {
+      console.error("Delete error:", error);
+
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete item";
+
+      showError(msg);
     } finally {
       setIsLoading(false);
     }
   };
+
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -205,13 +215,13 @@ export function ItemDetail() {
 
   // Calculate key metrics
   const totalOrders = item.vendors.length;
-  const totalQuantity = item.vendors.length > 0 
+  const totalQuantity = item.vendors.length > 0
     ? item.vendors.reduce((sum, vendor) => sum + vendor.unitPrice, 0)
     : 0;
   const averagePrice = item.vendors.length > 0
     ? item.vendors.reduce((sum, vendor) => sum + vendor.unitPrice, 0) / totalOrders
     : 0;
-  
+
   const vendorColumns = [
     {
       header: "Vendor Name",
@@ -277,8 +287,8 @@ export function ItemDetail() {
           </Badge>
         </div>
         <div className="flex space-x-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => navigate(`/items/${id}/edit`)}
           >
             <Edit className="h-4 w-4 mr-2" />
@@ -393,11 +403,11 @@ export function ItemDetail() {
                 <div>
                   <Label>Unit Price</Label>
                   <p className="text-sm">
-                    {item.vendors.length > 0 
+                    {item.vendors.length > 0
                       ? new Intl.NumberFormat("en-IN", {
-                          style: "currency",
-                          currency: "INR",
-                        }).format(item.vendors[0].unitPrice)
+                        style: "currency",
+                        currency: "INR",
+                      }).format(item.vendors[0].unitPrice)
                       : "No vendor price available"}
                   </p>
                 </div>
@@ -467,7 +477,7 @@ export function ItemDetail() {
                 </CardHeader>
                 <CardContent>
                   {vendorPriceHistories[vendor.vendor.id] ? (
-                    <PriceHistory 
+                    <PriceHistory
                       data={vendorPriceHistories[vendor.vendor.id]}
                       vendorName={vendor.vendor.name}
                     />
@@ -477,7 +487,7 @@ export function ItemDetail() {
                 </CardContent>
               </Card>
             ))}
-            
+
             {item.vendors.length === 0 && (
               <Card>
                 <CardContent className="pt-6">
@@ -492,8 +502,8 @@ export function ItemDetail() {
       </Tabs>
 
       {/* Update Vendor Price Dialog */}
-      <Dialog 
-        open={!!selectedVendor} 
+      <Dialog
+        open={!!selectedVendor}
         onOpenChange={(open) => !open && setSelectedVendor(null)}
       >
         <DialogContent>

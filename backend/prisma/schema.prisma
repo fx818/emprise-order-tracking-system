@@ -230,6 +230,7 @@ model Vendor {
   gstin          String?
   address        String
   bankDetails    Json
+  remarks        String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   purchaseOrders PurchaseOrder[]

@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '../../../components/ui/aler
 import { AlertTriangle } from 'lucide-react';
 import type { PurchaseOrder, PurchaseOrderFormData } from '../types/purchase-order';
 import { LoadingSpinner } from '../../../components/feedback/LoadingSpinner';
+import EditPODocumentPage from './EditPODocumentPage';
 
 // Main container component for purchase order management
 export function PurchaseOrdersPage() {
@@ -23,12 +24,16 @@ export function PurchaseOrdersPage() {
       
       {/* Route for creating new purchase orders */}
       <Route path="new" element={<POFormPage mode="create" />} />
+
+      <Route path=":id/edit-documents" element={<EditPODocumentPage />} />
       
       {/* Route for editing purchase orders */}
       <Route path=":id/edit" element={<POFormPage mode="edit" />} />
       
       {/* Route for viewing purchase order details */}
       <Route path=":id" element={<PODetail />} />
+
+      {/* <Route path=":id/edit-documents" element={<EditPODocumentPage />} /> */}
       
       {/* Catch any invalid routes and redirect to the main listing */}
       <Route path="*" element={<Navigate to="/purchase-orders" />} />

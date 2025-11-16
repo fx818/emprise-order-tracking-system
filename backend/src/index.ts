@@ -181,7 +181,7 @@ async function startServer() {
   const loaService = new LoaService(loaRepository, tenderRepository, otherDocumentRepository, billRepository, s3Service, financialService);
   const vendorService = new VendorService(vendorRepository);
   const vendorItemService = new VendorItemService(vendorItemRepository);
-  const itemService = new ItemService(itemRepository);
+  const itemService = new ItemService(itemRepository, vendorItemRepository);
   const POpdfService = new POPDFService(s3Service);
   const purchaseOrderService = new PurchaseOrderService(
     purchaseOrderRepository,

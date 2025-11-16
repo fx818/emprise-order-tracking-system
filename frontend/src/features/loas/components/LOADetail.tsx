@@ -95,6 +95,7 @@ const getStatusDisplayText = (status: LOA['status']) => {
 
 export function LOADetail() {
   const { id } = useParams<{ id: string }>();
+
   const navigate = useNavigate();
   const { loading, getLOAById, deleteLOA, deleteAmendment, createOtherDocument, deleteOtherDocument, updatePendingSplit, updateManualFinancials, linkGeneralFdr, unlinkGeneralFdr } = useLOAs();
   const { loading: billsLoading, getBillsByLoaId, createBill, updateBill, deleteBill } = useBills();
@@ -354,6 +355,14 @@ export function LOADetail() {
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Update Status
+          </Button>
+          {/* 🚨 NEW DELETE BUTTON */}
+          <Button
+            variant="destructive"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
           </Button>
         </div>
       </div>
@@ -798,8 +807,8 @@ export function LOADetail() {
                 try {
                   const displayPending =
                     loa.manualTotalBilled !== undefined &&
-                    loa.manualTotalReceived !== undefined &&
-                    loa.manualTotalDeducted !== undefined
+                      loa.manualTotalReceived !== undefined &&
+                      loa.manualTotalDeducted !== undefined
                       ? Math.max(0, loa.manualTotalBilled - loa.manualTotalReceived - loa.manualTotalDeducted)
                       : loa.totalPending || 0;
                   const paymentPending = Math.max(0, displayPending - value);
@@ -936,8 +945,8 @@ export function LOADetail() {
                           <h4 className="font-medium">{po.poNumber}</h4>
                           <Badge variant={
                             po.status === 'COMPLETED' ? 'default' :
-                            po.status === 'IN_PROGRESS' ? 'destructive' :
-                            'secondary'
+                              po.status === 'IN_PROGRESS' ? 'destructive' :
+                                'secondary'
                           }>
                             {po.status}
                           </Badge>
@@ -1177,10 +1186,10 @@ export function LOADetail() {
                 {(!loa.documentUrl || loa.documentUrl === 'pending') &&
                   loa.amendments.every(a => !a.documentUrl) &&
                   (!loa.otherDocuments || loa.otherDocuments.length === 0) && (
-                  <div className="text-center text-muted-foreground py-8">
-                    No documents have been uploaded for this LOA
-                  </div>
-                )}
+                    <div className="text-center text-muted-foreground py-8">
+                      No documents have been uploaded for this LOA
+                    </div>
+                  )}
               </div>
             </CardContent>
           </Card>
@@ -1198,8 +1207,8 @@ export function LOADetail() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setDeleteDialogOpen(false)}
             >
               Cancel
@@ -1221,8 +1230,8 @@ export function LOADetail() {
         </DialogContent>
       </Dialog>
 
-      <Dialog 
-        open={deleteAmendmentDialogOpen} 
+      <Dialog
+        open={deleteAmendmentDialogOpen}
         onOpenChange={setDeleteAmendmentDialogOpen}
       >
         <DialogContent>
@@ -1233,8 +1242,8 @@ export function LOADetail() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setDeleteAmendmentDialogOpen(false);
                 setAmendmentToDelete(null);

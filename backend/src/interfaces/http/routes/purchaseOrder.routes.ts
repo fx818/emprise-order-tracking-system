@@ -217,10 +217,10 @@ export function purchaseOrderRoutes(controller: PurchaseOrderController) {
     controller.getAllPurchaseOrders
   );
 
-  // router.patch('/:id/status',
-  //   authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
-  //   controller.updateStatus
-  // );
+  router.patch('/:id/status',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),
+    controller.updateStatus
+  );
 
   router.post('/:id/generate-pdf',
     authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.PO_SPECIALIST]),
@@ -236,6 +236,12 @@ export function purchaseOrderRoutes(controller: PurchaseOrderController) {
     authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.PO_SPECIALIST]),
     controller.submitForApproval
   );
+
+  router.put('/:id/update-document',
+    authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.PO_SPECIALIST]),
+    controller.updateDocumentFields
+  );
+
 
   // router.post('/:id/approve',
   //   authMiddleware([UserRole.ADMIN, UserRole.MANAGER]),

@@ -16,6 +16,7 @@ export interface BankDetails {
     mobile: string;
     gstin?: string;
     address: string;
+    remarks?: string;
     bankDetails: BankDetails;
     items?: VendorItem[];
     purchaseOrders?: PurchaseOrder[];

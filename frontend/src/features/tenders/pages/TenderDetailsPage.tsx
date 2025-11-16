@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../../components/ui/select";
+import { Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -54,7 +55,7 @@ export function TenderDetailsPage() {
   const [emdReleaseAmount, setEmdReleaseAmount] = useState<string>('');
   const [isUpdatingEMDStatus, setIsUpdatingEMDStatus] = useState(false);
   const navigate = useNavigate();
-  const { getTenderById, updateTenderStatus, updateEMDReleaseStatus } = useTenders();
+  const { getTenderById, updateTenderStatus, updateEMDReleaseStatus, deleteTender } = useTenders();
   const { getLoasByTender } = useLOAs();
 
   useEffect(() => {
@@ -215,6 +216,26 @@ export function TenderDetailsPage() {
     }
   };
 
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+
+  const handleDeleteTender = async () => {
+    if (!id) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteTender(id);
+      setIsDeleteDialogOpen(false);
+      navigate("/tenders"); // redirect after deletion
+    } catch (err) {
+      console.error("Failed to delete tender", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
   const openEMDReleaseDialog = () => {
     setSelectedEMDReleaseStatus(tender?.emdReleaseStatus || 'PENDING');
     setEmdReleaseDate(tender?.emdReleaseDate ? format(new Date(tender.emdReleaseDate), 'yyyy-MM-dd') : '');
@@ -240,7 +261,7 @@ export function TenderDetailsPage() {
       <Helmet>
         <title>{tender.tenderNumber} | Emprise Order Tracking</title>
       </Helmet>
-      
+
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -252,8 +273,8 @@ export function TenderDetailsPage() {
             {getStatusBadge(tender.status)}
           </div>
           <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsStatusDialogOpen(true)}
             >
               <RefreshCcw className="h-4 w-4 mr-2" />
@@ -262,6 +283,14 @@ export function TenderDetailsPage() {
             <Button onClick={() => navigate(`/tenders/${id}/edit`)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit Tender
+            </Button>
+            {/* DELETE */}
+            <Button
+              variant="destructive"
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
             </Button>
           </div>
         </div>
@@ -665,7 +694,7 @@ export function TenderDetailsPage() {
               Change the status of tender {tender.tenderNumber}.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="status" className="text-right">
@@ -688,7 +717,7 @@ export function TenderDetailsPage() {
               </Select>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>
               Cancel
@@ -699,6 +728,28 @@ export function TenderDetailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* DELETE CONFIRMATION DIALOG */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Tender?</DialogTitle>
+            <DialogDescription>
+              This action is permanent and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={isDeleting} onClick={handleDeleteTender}>
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </>
   );
 } 

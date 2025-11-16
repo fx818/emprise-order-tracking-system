@@ -46,6 +46,11 @@ export class VendorValidator {
       errors.push({ field: 'address', message: 'Address must be between 10 and 500 characters' });
     }
 
+    // Remarks validation (if provided)
+    if (dto.remarks && (dto.remarks.length < 2 || dto.remarks.length > 300)) {
+      errors.push({ field: 'remarks', message: 'Remarks must be between 2 and 300 characters' });
+    }
+
     // Bank details validation
     if (!dto.bankDetails) {
       errors.push({ field: 'bankDetails', message: 'Bank details are required' });

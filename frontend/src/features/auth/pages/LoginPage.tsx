@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { LoginForm } from '../components/LoginForm';
 import { motion } from 'framer-motion';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
-import empriseLogo from '../../../assets/empriseLogo.png';
+// import empriseLogo from '../../../assets/empriseLogo.png';
+import empriseLogo from '../../../assets/emprise.jpeg';
 
 // Minimal geometric background animation
 const MinimalBackground = () => {
@@ -37,7 +38,7 @@ const MinimalBackground = () => {
         >
           {/* Company Logo */}
           <div className="mb-8">
-            <img src={empriseLogo} alt="Emprise Marketing Logo" className="h-12" />
+            <img src={empriseLogo} alt="Emprise Univora Logo" className="h-12" />
           </div>
           
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">

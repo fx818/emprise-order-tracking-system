@@ -27,7 +27,7 @@ export interface FDR {
   extractedData?: any;
 
   // Status
-  status: 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'RETURNED';
+  status: 'RUNNING' | 'AVAILABLE_FOR_RELEASE' | 'CANCELLED' | 'RETURNED';
 
   // Relations
   offerId?: string;

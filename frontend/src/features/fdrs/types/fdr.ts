@@ -14,7 +14,7 @@ export const fdrSchema = z.object({
   contractDetails: z.string().optional(),
   poc: z.string().optional(),
   location: z.string().optional(),
-  status: z.enum(['RUNNING', 'COMPLETED', 'CANCELLED', 'RETURNED']).optional(),
+  status: z.enum(['RUNNING', 'AVAILABLE_FOR_RELEASE', 'CANCELLED', 'RETURNED']).optional(),
   offerId: z.string().optional(),
   tags: z.array(z.string()).optional(),
   documentFile: z.any().optional() // We'll handle file validation separately
@@ -58,7 +58,7 @@ export interface FDR {
   };
 
   // Status
-  status: 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'RETURNED';
+  status: 'RUNNING' | 'AVAILABLE_FOR_RELEASE' | 'CANCELLED' | 'RETURNED';
 
   // Relations
   offer?: {

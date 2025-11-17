@@ -83,6 +83,11 @@ export interface FDRSummary {
   id: string;
   bankName: string;
   fdrNumber?: string;
+  // change these from boolean → object or null
+  loaForSD?: { id: string; loaNumber: string } | null;
+  loaForPG?: { id: string; loaNumber: string } | null;
+  // Fix: this contains a nested loa object
+  generalLoaLinks?: { loa: { id: string; loaNumber: string } }[];
   accountNo?: string;
   depositAmount: number;
   dateOfDeposit: string;

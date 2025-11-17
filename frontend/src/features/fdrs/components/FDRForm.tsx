@@ -512,7 +512,7 @@ export function FDRForm({ initialData, onSubmit, onCancel, mode = 'create' }: FD
                 </FormControl>
                 <SelectContent>
                   <SelectItem value="RUNNING">Running</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                  <SelectItem value="AVAILABLE_FOR_RELEASE">Available for release</SelectItem>
                   <SelectItem value="CANCELLED">Cancelled</SelectItem>
                   <SelectItem value="RETURNED">Returned</SelectItem>
                 </SelectContent>

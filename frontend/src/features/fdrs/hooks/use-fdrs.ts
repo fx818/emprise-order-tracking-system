@@ -123,6 +123,8 @@ export function useFDRs() {
         }
       });
 
+      console.log('the data is ', formData)
+
       const response = await apiClient.put(`/fdrs/${id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -159,6 +161,7 @@ export function useFDRs() {
   const updateFDRStatus = async (id: string, status: FDR['status']) => {
     try {
       setLoading(true);
+      console.log('updating status to ', status);
       const response = await apiClient.patch<FDRResponse>(`/fdrs/${id}/status`, {
         status,
       });

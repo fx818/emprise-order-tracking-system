@@ -152,7 +152,7 @@ export function LinkFDRDialog({
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="RUNNING">Running</SelectItem>
-                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="AVAILABLE_FOR_RELEASE">Available for release</SelectItem>
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
                 <SelectItem value="RETURNED">Returned</SelectItem>
               </SelectContent>

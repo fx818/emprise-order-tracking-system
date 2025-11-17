@@ -356,7 +356,7 @@ export class PrismaFdrRepository {
         },
       },
       data: {
-        status: 'COMPLETED',
+        status: 'AVAILABLE_FOR_RELEASE',
       },
     });
 

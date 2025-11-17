@@ -462,7 +462,7 @@ enum FDRCategory {
 
 enum FDRStatus {
   RUNNING
-  COMPLETED
+  AVAILABLE_FOR_RELEASE
   CANCELLED
   RETURNED
 }

@@ -154,6 +154,155 @@ export class PrismaLoaRepository {
       updatedAt: prismaAmendment.updatedAt
     };
   }
+  // async create(data: {
+  //   loaNumber: string;
+  //   loaValue: number;
+  //   deliveryPeriod: DeliveryPeriod;
+  //   workDescription: string;
+  //   documentUrl: string;
+  //   tags: string[];
+  //   siteId: string;
+  //   remarks?: string;
+  //   tenderNo?: string;
+  //   tenderId?: string;
+  //   orderPOC?: string;
+  //   pocId?: string;
+  //   inspectionAgencyId?: string;
+  //   fdBgDetails?: string;
+  //   hasEmd?: boolean;
+  //   emdAmount?: number;
+  //   hasSd?: boolean;
+  //   sdFdrId?: string;
+  //   hasPg?: boolean;
+  //   pgFdrId?: string;
+  //   warrantyPeriodMonths?: number;
+  //   warrantyPeriodYears?: number;
+  //   warrantyStartDate?: Date;
+  //   warrantyEndDate?: Date;
+  //   dueDate?: Date;
+  //   orderReceivedDate?: Date;
+  //   recoverablePending?: number;
+  //   paymentPending?: number;
+  //   manualTotalBilled?: number;
+  //   manualTotalReceived?: number;
+  //   manualTotalDeducted?: number;
+  // }): Promise<LOA> {
+  //   try {
+
+  //     const createData: Prisma.LOACreateInput = {
+  //       loaNumber: data.loaNumber,
+  //       loaValue: data.loaValue,
+  //       deliveryPeriod: {
+  //         start: new Date(data.deliveryPeriod.start),
+  //         end: new Date(data.deliveryPeriod.end)
+  //       },
+  //       workDescription: data.workDescription,
+  //       documentUrl: data.documentUrl,
+  //       tags: data.tags,
+  //       site: { connect: { id: data.siteId } },   // convert to relation connect
+  //       tenderNo: data.tenderNo || null,
+  //       remarks: data.remarks || null,
+  //       orderPOC: data.orderPOC || null,
+  //       fdBgDetails: data.fdBgDetails || null,
+  //       hasEmd: data.hasEmd || false,
+  //       emdAmount: data.emdAmount || null,
+  //       hasSd: data.hasSd || false,
+  //       hasPg: data.hasPg || false,
+  //       warrantyPeriodMonths: data.warrantyPeriodMonths,
+  //       warrantyPeriodYears: data.warrantyPeriodYears,
+  //       warrantyStartDate: data.warrantyStartDate ? new Date(data.warrantyStartDate) : null,
+  //       warrantyEndDate: data.warrantyEndDate ? new Date(data.warrantyEndDate) : null,
+  //       dueDate: data.dueDate ? new Date(data.dueDate) : null,
+  //       orderReceivedDate: data.orderReceivedDate ? new Date(data.orderReceivedDate) : null,
+  //       recoverablePending: data.recoverablePending ?? 0,
+  //       paymentPending: data.paymentPending ?? 0,
+  //       manualTotalBilled: data.manualTotalBilled ?? null,
+  //       manualTotalReceived: data.manualTotalReceived ?? null,
+  //       manualTotalDeducted: data.manualTotalDeducted ?? null
+  //     };
+
+  //     // Tender relation
+  //     if (data.tenderId) {
+  //       createData.tender = { connect: { id: data.tenderId } };
+  //     }
+
+  //     // POC relation
+  //     if (data.pocId) {
+  //       createData.poc = { connect: { id: data.pocId } };
+  //     }
+
+  //     // Inspection agency
+  //     if (data.inspectionAgencyId) {
+  //       createData.inspectionAgency = { connect: { id: data.inspectionAgencyId } };
+  //     }
+
+  //     // ==========================
+  //     // FDR: Security Deposit (SD)
+  //     // ==========================
+  //     if (data.hasSd !== undefined) createData.hasSd = data.hasSd;
+
+  //     if (data.sdFdrId !== undefined) {
+  //       if (!data.hasSd || !data.sdFdrId) {
+  //         // do not connect
+  //         createData.sdFdr = undefined;
+  //       } else {
+  //         const sdFdrExists = await this.prisma.fDR.findUnique({
+  //           where: { id: data.sdFdrId }
+  //         });
+
+  //         if (!sdFdrExists) {
+  //           throw new Error(`Invalid sdFdrId: ${data.sdFdrId} — FDR record not found`);
+  //         }
+
+  //         createData.sdFdr = { connect: { id: data.sdFdrId } };
+  //       }
+  //     }
+
+  //     // ==========================
+  //     // FDR: Performance Guarantee (PG)
+  //     // ==========================
+  //     if (data.hasPg !== undefined) createData.hasPg = data.hasPg;
+
+  //     if (data.pgFdrId !== undefined) {
+  //       if (!data.hasPg || !data.pgFdrId) {
+  //         // do not connect
+  //         createData.pgFdr = undefined;
+  //       } else {
+  //         const pgFdrExists = await this.prisma.fDR.findUnique({
+  //           where: { id: data.pgFdrId }
+  //         });
+
+  //         if (!pgFdrExists) {
+  //           throw new Error(`Invalid pgFdrId: ${data.pgFdrId} — FDR record not found`);
+  //         }
+
+  //         createData.pgFdr = { connect: { id: data.pgFdrId } };
+  //       }
+  //     }
+
+  //     const created = await this.prisma.lOA.create({
+  //       data: createData,
+  //       include: {
+  //         amendments: true,
+  //         purchaseOrders: true,
+  //         invoices: true,
+  //         site: { include: { zone: true } },
+  //         tender: true,
+  //         poc: true,
+  //         inspectionAgency: true,
+  //         sdFdr: true,
+  //         pgFdr: true
+  //       }
+  //     });
+
+  //     return this.mapPrismaLoaToLoa(created);
+
+  //   } catch (error) {
+  //     console.error("Prisma LOA create error:", error);
+  //     throw error;
+  //   }
+  // }
+
   async create(data: {
     loaNumber: string;
     loaValue: number;
@@ -188,28 +337,39 @@ export class PrismaLoaRepository {
     manualTotalDeducted?: number;
   }): Promise<LOA> {
     try {
+      // ==========================
+      // BASIC REQUIRED VALIDATION
+      // ==========================
+      if (!data.loaNumber) throw new Error("LOA number is required.");
+      if (!data.siteId) throw new Error("siteId is required.");
+      if (!data.deliveryPeriod?.start || !data.deliveryPeriod?.end) {
+        throw new Error("deliveryPeriod requires both 'start' and 'end' values.");
+      }
 
+      // ==========================
+      // BUILD CREATE DATA
+      // ==========================
       const createData: Prisma.LOACreateInput = {
         loaNumber: data.loaNumber,
         loaValue: data.loaValue,
         deliveryPeriod: {
           start: new Date(data.deliveryPeriod.start),
-          end: new Date(data.deliveryPeriod.end)
+          end: new Date(data.deliveryPeriod.end),
         },
         workDescription: data.workDescription,
         documentUrl: data.documentUrl,
-        tags: data.tags,
-        site: { connect: { id: data.siteId } },   // convert to relation connect
+        tags: data.tags ?? [],
+        site: { connect: { id: data.siteId } },
         tenderNo: data.tenderNo || null,
         remarks: data.remarks || null,
         orderPOC: data.orderPOC || null,
         fdBgDetails: data.fdBgDetails || null,
-        hasEmd: data.hasEmd || false,
-        emdAmount: data.emdAmount || null,
-        hasSd: data.hasSd || false,
-        hasPg: data.hasPg || false,
-        warrantyPeriodMonths: data.warrantyPeriodMonths,
-        warrantyPeriodYears: data.warrantyPeriodYears,
+        hasEmd: data.hasEmd ?? false,
+        emdAmount: data.emdAmount ?? null,
+        hasSd: data.hasSd ?? false,
+        hasPg: data.hasPg ?? false,
+        warrantyPeriodMonths: data.warrantyPeriodMonths ?? null,
+        warrantyPeriodYears: data.warrantyPeriodYears ?? null,
         warrantyStartDate: data.warrantyStartDate ? new Date(data.warrantyStartDate) : null,
         warrantyEndDate: data.warrantyEndDate ? new Date(data.warrantyEndDate) : null,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
@@ -218,33 +378,39 @@ export class PrismaLoaRepository {
         paymentPending: data.paymentPending ?? 0,
         manualTotalBilled: data.manualTotalBilled ?? null,
         manualTotalReceived: data.manualTotalReceived ?? null,
-        manualTotalDeducted: data.manualTotalDeducted ?? null
+        manualTotalDeducted: data.manualTotalDeducted ?? null,
       };
 
-      // Tender relation
-      if (data.tenderId) {
-        createData.tender = { connect: { id: data.tenderId } };
-      }
-
-      // POC relation
-      if (data.pocId) {
-        createData.poc = { connect: { id: data.pocId } };
-      }
-
-      // Inspection agency
+      // ==========================
+      // RELATIONS: Tender / POC / Agency
+      // ==========================
+      if (data.tenderId) createData.tender = { connect: { id: data.tenderId } };
+      if (data.pocId) createData.poc = { connect: { id: data.pocId } };
       if (data.inspectionAgencyId) {
         createData.inspectionAgency = { connect: { id: data.inspectionAgencyId } };
       }
 
-      // FDR Relations must use connect labels like update()
+      // ==========================
+      // SECURITY DEPOSIT FDR
+      // ==========================
       if (data.hasSd && data.sdFdrId) {
+        const exists = await this.prisma.fDR.findUnique({ where: { id: data.sdFdrId } });
+        if (!exists) throw new Error(`Invalid Security Deposit FDR ID: ${data.sdFdrId}`);
         createData.sdFdr = { connect: { id: data.sdFdrId } };
       }
 
+      // ==========================
+      // PERFORMANCE GUARANTEE FDR
+      // ==========================
       if (data.hasPg && data.pgFdrId) {
+        const exists = await this.prisma.fDR.findUnique({ where: { id: data.pgFdrId } });
+        if (!exists) throw new Error(`Invalid Performance Guarantee FDR ID: ${data.pgFdrId}`);
         createData.pgFdr = { connect: { id: data.pgFdrId } };
       }
 
+      // ==========================
+      // CREATE RECORD
+      // ==========================
       const created = await this.prisma.lOA.create({
         data: createData,
         include: {
@@ -256,133 +422,159 @@ export class PrismaLoaRepository {
           poc: true,
           inspectionAgency: true,
           sdFdr: true,
-          pgFdr: true
-        }
+          pgFdr: true,
+        },
       });
 
       return this.mapPrismaLoaToLoa(created);
 
-    } catch (error) {
-      console.error("Prisma LOA create error:", error);
-      throw error;
+    } catch (error: any) {
+      console.error("LOA create error:", error);
+
+      // Prisma unique constraint violation (duplicate LOA number, FDR already mapped, etc)
+      if (error.code === "P2002") {
+        throw new Error("Duplicate entry: LOA number or FDR reference already in use.");
+      }
+
+      // Foreign key / relation failure
+      if (error.code === "P2003") {
+        throw new Error(
+          `Foreign key constraint failed — related entity doesn't exist. Details: ${error.meta?.field_name}`
+        );
+      }
+
+      // Missing required relation record
+      if (error.code === "P2025") {
+        throw new Error("Creation failed — required related record not found.");
+      }
+
+      throw new Error(error.message || "Unexpected error occurred while creating LOA.");
     }
   }
-
 
 
   async update(id: string, data: any): Promise<LOA> {
     const updateData: Prisma.LOAUpdateInput = {};
 
-    // ==========================
-    // BASIC FIELDS
-    // ==========================
-    if (data.loaNumber !== undefined) updateData.loaNumber = data.loaNumber;
-    if (data.loaValue !== undefined) updateData.loaValue = data.loaValue;
-    if (data.workDescription !== undefined) updateData.workDescription = data.workDescription;
-
-    // File URL if updated
-    if (data.documentUrl !== undefined) updateData.documentUrl = data.documentUrl;
-
-    // Tags
-    if (data.tags !== undefined) updateData.tags = { set: data.tags };
-
-    // Status
-    if (data.status !== undefined) updateData.status = data.status;
-
-    // ==========================
-    // DELIVERY PERIOD
-    // ==========================
-    if (data.deliveryPeriod) {
-      updateData.deliveryPeriod = {
-        start: new Date(data.deliveryPeriod.start),
-        end: new Date(data.deliveryPeriod.end)
-      };
-    }
-
-    // ==========================
-    // EMD
-    // ==========================
-    if (data.hasEmd !== undefined) updateData.hasEmd = data.hasEmd;
-    if (data.emdAmount !== undefined) updateData.emdAmount = data.emdAmount;
-
-    // ==========================
-    // WARRANTY
-    // ==========================
-    if (data.warrantyPeriodMonths !== undefined)
-      updateData.warrantyPeriodMonths = data.warrantyPeriodMonths;
-
-    if (data.warrantyPeriodYears !== undefined)
-      updateData.warrantyPeriodYears = data.warrantyPeriodYears;
-
-    if (data.warrantyStartDate !== undefined)
-      updateData.warrantyStartDate = data.warrantyStartDate
-        ? new Date(data.warrantyStartDate)
-        : null;
-
-    if (data.warrantyEndDate !== undefined)
-      updateData.warrantyEndDate = data.warrantyEndDate
-        ? new Date(data.warrantyEndDate)
-        : null;
-
-    // ==========================
-    // DATE FIELDS
-    // ==========================
-    if (data.dueDate !== undefined)
-      updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
-
-    if (data.orderReceivedDate !== undefined)
-      updateData.orderReceivedDate = data.orderReceivedDate
-        ? new Date(data.orderReceivedDate)
-        : null;
-
-    // ==========================
-    // TEXT & OPTIONAL FIELDS
-    // ==========================
-    if (data.remarks !== undefined) updateData.remarks = data.remarks;
-    if (data.tenderNo !== undefined) updateData.tenderNo = data.tenderNo;
-    if (data.orderPOC !== undefined) updateData.orderPOC = data.orderPOC;
-    if (data.fdBgDetails !== undefined) updateData.fdBgDetails = data.fdBgDetails;
-    if (data.recoverablePending !== undefined) updateData.recoverablePending = data.recoverablePending;
-    if (data.paymentPending !== undefined) updateData.paymentPending = data.paymentPending;
-    if (data.manualTotalBilled !== undefined) updateData.manualTotalBilled = data.manualTotalBilled;
-    if (data.manualTotalReceived !== undefined) updateData.manualTotalReceived = data.manualTotalReceived;
-    if (data.manualTotalDeducted !== undefined) updateData.manualTotalDeducted = data.manualTotalDeducted;
-
-    // ==========================
-    // RELATIONS: Tender / POC / Agency
-    // ==========================
-    if (data.tenderId !== undefined)
-      updateData.tender = data.tenderId ? { connect: { id: data.tenderId } } : { disconnect: true };
-
-    if (data.pocId !== undefined)
-      updateData.poc = data.pocId ? { connect: { id: data.pocId } } : { disconnect: true };
-
-    if (data.inspectionAgencyId !== undefined)
-      updateData.inspectionAgency = data.inspectionAgencyId
-        ? { connect: { id: data.inspectionAgencyId } }
-        : { disconnect: true };
-
-    // ==========================
-    // FDR LINKING
-    // ==========================
-    if (data.hasSd !== undefined) updateData.hasSd = data.hasSd;
-    if (data.sdFdrId !== undefined) {
-      updateData.sdFdr = data.sdFdrId
-        ? { connect: { id: data.sdFdrId } }
-        : { disconnect: true };
-    }
-
-    if (data.hasPg !== undefined) updateData.hasPg = data.hasPg;
-    if (data.pgFdrId !== undefined) {
-      updateData.pgFdr = data.pgFdrId
-        ? { connect: { id: data.pgFdrId } }
-        : { disconnect: true };
-    }
-
-    // ==========================
-    // UPDATE QUERY
-    // ==========================
     try {
+      // Ensure LOA exists before updating
+      const existing = await this.prisma.lOA.findUnique({ where: { id } });
+      if (!existing) {
+        throw new Error(`LOA not found with id: ${id}`);
+      }
+
+      // ==========================
+      // BASIC FIELDS
+      // ==========================
+      if (data.loaNumber !== undefined) updateData.loaNumber = data.loaNumber;
+      if (data.loaValue !== undefined) updateData.loaValue = data.loaValue;
+      if (data.workDescription !== undefined) updateData.workDescription = data.workDescription;
+
+      // File URL if updated
+      if (data.documentUrl !== undefined) updateData.documentUrl = data.documentUrl;
+
+      // Tags
+      if (data.tags !== undefined) updateData.tags = { set: data.tags };
+
+      // Status
+      if (data.status !== undefined) updateData.status = data.status;
+
+      // ==========================
+      // DELIVERY PERIOD
+      // ==========================
+      if (data.deliveryPeriod) {
+        if (!data.deliveryPeriod.start || !data.deliveryPeriod.end) {
+          throw new Error("deliveryPeriod requires both 'start' and 'end' values.");
+        }
+        updateData.deliveryPeriod = {
+          start: new Date(data.deliveryPeriod.start),
+          end: new Date(data.deliveryPeriod.end),
+        };
+      }
+
+      // ==========================
+      // EMD
+      // ==========================
+      if (data.hasEmd !== undefined) updateData.hasEmd = data.hasEmd;
+      if (data.emdAmount !== undefined) {
+        if (isNaN(data.emdAmount)) throw new Error("emdAmount must be a valid number.");
+        updateData.emdAmount = data.emdAmount;
+      }
+
+      // ==========================
+      // WARRANTY
+      // ==========================
+      if (data.warrantyPeriodMonths !== undefined) updateData.warrantyPeriodMonths = data.warrantyPeriodMonths;
+      if (data.warrantyPeriodYears !== undefined) updateData.warrantyPeriodYears = data.warrantyPeriodYears;
+      if (data.warrantyStartDate !== undefined)
+        updateData.warrantyStartDate = data.warrantyStartDate ? new Date(data.warrantyStartDate) : null;
+      if (data.warrantyEndDate !== undefined)
+        updateData.warrantyEndDate = data.warrantyEndDate ? new Date(data.warrantyEndDate) : null;
+
+      // ==========================
+      // DATE FIELDS
+      // ==========================
+      if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+      if (data.orderReceivedDate !== undefined)
+        updateData.orderReceivedDate = data.orderReceivedDate ? new Date(data.orderReceivedDate) : null;
+
+      // ==========================
+      // TEXT & OPTIONAL FIELDS
+      // ==========================
+      if (data.remarks !== undefined) updateData.remarks = data.remarks;
+      if (data.tenderNo !== undefined) updateData.tenderNo = data.tenderNo;
+      if (data.orderPOC !== undefined) updateData.orderPOC = data.orderPOC;
+      if (data.fdBgDetails !== undefined) updateData.fdBgDetails = data.fdBgDetails;
+      if (data.recoverablePending !== undefined) updateData.recoverablePending = data.recoverablePending;
+      if (data.paymentPending !== undefined) updateData.paymentPending = data.paymentPending;
+      if (data.manualTotalBilled !== undefined) updateData.manualTotalBilled = data.manualTotalBilled;
+      if (data.manualTotalReceived !== undefined) updateData.manualTotalReceived = data.manualTotalReceived;
+      if (data.manualTotalDeducted !== undefined) updateData.manualTotalDeducted = data.manualTotalDeducted;
+
+      // ==========================
+      // RELATIONS: Tender / POC / Agency
+      // ==========================
+      if (data.tenderId !== undefined)
+        updateData.tender = data.tenderId ? { connect: { id: data.tenderId } } : { disconnect: true };
+
+      if (data.pocId !== undefined)
+        updateData.poc = data.pocId ? { connect: { id: data.pocId } } : { disconnect: true };
+
+      if (data.inspectionAgencyId !== undefined)
+        updateData.inspectionAgency = data.inspectionAgencyId
+          ? { connect: { id: data.inspectionAgencyId } }
+          : { disconnect: true };
+
+      // ==========================
+      // FDR VALIDATION & RELATIONS
+      // ==========================
+      // Security Deposit FDR
+      if (data.hasSd !== undefined) updateData.hasSd = data.hasSd;
+      if (data.sdFdrId !== undefined) {
+        if (!data.hasSd || !data.sdFdrId) {
+          updateData.sdFdr = { disconnect: true };
+        } else {
+          const exists = await this.prisma.fDR.findUnique({ where: { id: data.sdFdrId } });
+          if (!exists) throw new Error(`Invalid Security Deposit FDR id: ${data.sdFdrId}`);
+          updateData.sdFdr = { connect: { id: data.sdFdrId } };
+        }
+      }
+
+      // Performance Guarantee FDR
+      if (data.hasPg !== undefined) updateData.hasPg = data.hasPg;
+      if (data.pgFdrId !== undefined) {
+        if (!data.hasPg || !data.pgFdrId) {
+          updateData.pgFdr = { disconnect: true };
+        } else {
+          const exists = await this.prisma.fDR.findUnique({ where: { id: data.pgFdrId } });
+          if (!exists) throw new Error(`Invalid Performance Guarantee FDR id: ${data.pgFdrId}`);
+          updateData.pgFdr = { connect: { id: data.pgFdrId } };
+        }
+      }
+
+      // ==========================
+      // UPDATE OPERATION
+      // ==========================
       const updated = await this.prisma.lOA.update({
         where: { id },
         data: updateData,
@@ -400,11 +592,23 @@ export class PrismaLoaRepository {
       });
 
       return this.mapPrismaLoaToLoa(updated);
-    } catch (error) {
-      console.error('LOA update error:', error);
-      throw error;
+    } catch (error: any) {
+      console.error("LOA update error:", error);
+
+      // Prisma relation error
+      if (error.code === "P2025") {
+        throw new Error("Update failed: Related record not found or cannot connect.");
+      }
+
+      if (error.code === "P2003") {
+        throw new Error("Foreign key constraint failed: FDR not found or already linked.");
+      }
+
+      // General error
+      throw new Error(error.message || "Unexpected failure while updating LOA");
     }
   }
+
 
   async delete(id: string): Promise<LOA> {
     const prismaLoa = await this.prisma.lOA.delete({
@@ -419,6 +623,15 @@ export class PrismaLoaRepository {
 
     return this.mapPrismaLoaToLoa(prismaLoa);
   }
+
+
+  async findFdrById(id: string) {
+    return this.prisma.fDR.findUnique({
+      where: { id },
+    });
+  }
+
+
 
   async findById(id: string): Promise<LOA | null> {
     const prismaLoa = await this.prisma.lOA.findUnique({

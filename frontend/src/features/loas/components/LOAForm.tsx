@@ -106,6 +106,13 @@ export function LOAForm({
   const [newPocName, setNewPocName] = useState('');
   const [showAddInspectionAgencyDialog, setShowAddInspectionAgencyDialog] = useState(false);
   const [newInspectionAgencyName, setNewInspectionAgencyName] = useState('');
+  // Filter only unlinked FDRs
+  const freeFdrs = fdrs.filter(
+    (fdr) =>
+      !fdr.loaForSD &&
+      !fdr.loaForPG &&
+      (!fdr.generalLoaLinks || fdr.generalLoaLinks.length === 0)
+  );
 
   // Step configuration
   const steps = [
@@ -1278,7 +1285,7 @@ export function LOAForm({
                                   <CommandList>
                                     <CommandEmpty>No FDR found.</CommandEmpty>
                                     <CommandGroup>
-                                      {fdrs.map((fdr) => (
+                                      {freeFdrs.map((fdr) => (
                                         <CommandItem
                                           value={fdr.id}
                                           key={fdr.id}
@@ -1389,7 +1396,7 @@ export function LOAForm({
                                   <CommandList>
                                     <CommandEmpty>No FDR found.</CommandEmpty>
                                     <CommandGroup>
-                                      {fdrs.map((fdr) => (
+                                      {freeFdrs.map((fdr) => (
                                         <CommandItem
                                           value={fdr.id}
                                           key={fdr.id}

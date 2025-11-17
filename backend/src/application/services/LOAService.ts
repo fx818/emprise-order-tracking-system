@@ -34,24 +34,24 @@ export class LoaService {
 
     private async processDocument(file: Express.Multer.File): Promise<string> {
         try {
-          // Generate unique filename
-          const fileExtension = path.extname(file.originalname);
-          const fileName = `loas/${crypto.randomUUID()}${fileExtension}`;
-    
-          // Read file buffer
-          const fileBuffer = await fs.readFile(file.path);
-    
-          // Upload to S3
-          const documentUrl = await this.storageService.uploadFile(
-            fileName,
-            fileBuffer,
-            file.mimetype
-          );
-    
-          return documentUrl;
+            // Generate unique filename
+            const fileExtension = path.extname(file.originalname);
+            const fileName = `loas/${crypto.randomUUID()}${fileExtension}`;
+
+            // Read file buffer
+            const fileBuffer = await fs.readFile(file.path);
+
+            // Upload to S3
+            const documentUrl = await this.storageService.uploadFile(
+                fileName,
+                fileBuffer,
+                file.mimetype
+            );
+
+            return documentUrl;
         } catch (error) {
-          console.error('Error processing document:', error);
-          throw new Error('Failed to process document');
+            console.error('Error processing document:', error);
+            throw new Error('Failed to process document');
         }
     }
 
@@ -62,7 +62,7 @@ export class LoaService {
             if (!validationResult.isSuccess) {
                 return ResultUtils.fail('Validation processing failed');
             }
-            
+
             if (validationResult.data && validationResult.data.length > 0) {
                 return ResultUtils.fail('Validation failed', validationResult.data);
             }
@@ -93,18 +93,18 @@ export class LoaService {
             let tags: string[] = [];
             if (dto.tags) {
                 if (Array.isArray(dto.tags)) {
-                  tags = dto.tags;
+                    tags = dto.tags;
                 } else if (typeof dto.tags === 'string') {
-                  try {
-                    const parsedTags = JSON.parse(dto.tags);
-                    if (Array.isArray(parsedTags)) {
-                      tags = parsedTags;
+                    try {
+                        const parsedTags = JSON.parse(dto.tags);
+                        if (Array.isArray(parsedTags)) {
+                            tags = parsedTags;
+                        }
+                    } catch (error) {
+                        console.warn('Failed to parse tags string, using empty array:', error);
                     }
-                  } catch (error) {
-                    console.warn('Failed to parse tags string, using empty array:', error);
-                  }
                 }
-              }
+            }
 
             // Step 4: Process document files
             const documentUrls = await this.processDocumentFiles(dto);
@@ -146,7 +146,8 @@ export class LoaService {
             return ResultUtils.ok(loa);
         } catch (error) {
             console.error('LOA Creation Error:', error);
-            return ResultUtils.fail('Failed to create LOA record');
+            const message = error instanceof Error ? error.message : String(error);
+            return ResultUtils.fail(`Failed to create LOA record: ${message}`);
         }
     }
 
@@ -187,65 +188,104 @@ export class LoaService {
             };
         }
     }
-
     async updateLoa(id: string, dto: UpdateLoaDto): Promise<Result<any>> {
         try {
+            // ==========================
+            // STEP 1: Verify LOA Exists
+            // ==========================
             const existingLoa = await this.repository.findById(id);
             if (!existingLoa) {
-                return ResultUtils.fail('LOA not found');
+                return ResultUtils.fail("LOA not found");
             }
 
-            // If updating LOA number, check for uniqueness
+            // ==========================
+            // STEP 2: Validate Unique LOA Number
+            // ==========================
             if (dto.loaNumber && dto.loaNumber !== existingLoa.loaNumber) {
-                const duplicateLoa = await this.repository.findByLoaNumber(dto.loaNumber);
-                if (duplicateLoa) {
-                    return ResultUtils.fail('LOA number already exists');
-                }
+                const duplicate = await this.repository.findByLoaNumber(dto.loaNumber);
+                if (duplicate) return ResultUtils.fail("LOA number already exists");
             }
 
-            // Validate tender if provided
-            if (dto.tenderId !== undefined) {
+            // ==========================
+            // STEP 3: Validate Tender (if changed)
+            // ==========================
+            // Validate tender change
+            const existingTenderId = existingLoa.tender?.id ?? null;
+
+            if (dto.tenderId !== undefined && dto.tenderId !== existingTenderId) {
                 if (dto.tenderId) {
                     const tender = await this.tenderRepository.findById(dto.tenderId);
                     if (!tender) {
-                        return ResultUtils.fail('Tender not found');
+                        return ResultUtils.fail("Provided tender does not exist");
                     }
                 }
             }
 
-            // Process files
-            let documentUrl = existingLoa.documentUrl;
 
+            // ==========================
+            // STEP 4: Document Processing
+            // ==========================
+            let documentUrl = existingLoa.documentUrl;
             if (dto.documentFile) {
                 try {
                     documentUrl = await this.processDocument(dto.documentFile);
-                } catch (error) {
-                    console.error('Error processing document file:', error);
-                    return ResultUtils.fail('Failed to process document file');
+                } catch (err) {
+                    console.error("File processing failed:", err);
+                    return ResultUtils.fail("Failed to process uploaded file");
                 }
             }
 
-            // Handle tags
+            // ==========================
+            // STEP 5: Tags Handling
+            // ==========================
             let tags = existingLoa.tags;
-            if (dto.tags) {
-                if (typeof dto.tags === 'string') {
-                    try {
-                        tags = JSON.parse(dto.tags);
-                    } catch (error) {
-                        console.error('Error parsing tags:', error);
-                    }
-                } else {
-                    tags = dto.tags;
+            if (dto.tags !== undefined) {
+                try {
+                    tags = typeof dto.tags === "string" ? JSON.parse(dto.tags) : dto.tags;
+                } catch {
+                    return ResultUtils.fail("Invalid tags format — must be JSON array or array");
                 }
             }
 
-            // Prepare delivery period data if provided
-            const deliveryPeriod = dto.deliveryPeriod ? {
-                start: new Date(dto.deliveryPeriod.start),
-                end: new Date(dto.deliveryPeriod.end)
-            } : undefined;
+            // ==========================
+            // STEP 6: Delivery Period (optional)
+            // ==========================
+            let deliveryPeriod = undefined;
+            if (dto.deliveryPeriod) {
+                if (!dto.deliveryPeriod.start || !dto.deliveryPeriod.end) {
+                    return ResultUtils.fail("Delivery period requires both 'start' & 'end'");
+                }
+                deliveryPeriod = {
+                    start: new Date(dto.deliveryPeriod.start),
+                    end: new Date(dto.deliveryPeriod.end),
+                };
+            }
 
-            // Prepare update data
+            // ==========================
+            // STEP 7: FDR VALIDATION (security & guarantee)
+            // ==========================
+            const validateFdrExists = async (id?: string, label = "FDR") => {
+                if (!id) return true;
+                const found = await this.repository.findFdrById(id);
+                if (!found) return false;
+                return true;
+            };
+
+            if (dto.sdFdrId && dto.sdFdrId !== undefined && dto.hasSd) {
+                if (!(await validateFdrExists(dto.sdFdrId, "Security Deposit FDR"))) {
+                    return ResultUtils.fail(`Invalid sdFdrId — record not found`);
+                }
+            }
+
+            if (dto.pgFdrId && dto.pgFdrId !== undefined && dto.hasPg) {
+                if (!(await validateFdrExists(dto.pgFdrId, "Performance Guarantee FDR"))) {
+                    return ResultUtils.fail(`Invalid pgFdrId — record not found`);
+                }
+            }
+
+            // ==========================
+            // STEP 8: Prepare update payload
+            // ==========================
             const updateData: any = {
                 loaNumber: dto.loaNumber,
                 loaValue: dto.loaValue,
@@ -263,7 +303,9 @@ export class LoaService {
                 fdBgDetails: dto.fdBgDetails,
                 hasEmd: dto.hasEmd,
                 emdAmount: dto.emdAmount,
+                hasSd: dto.hasSd,
                 sdFdrId: dto.sdFdrId,
+                hasPg: dto.hasPg,
                 pgFdrId: dto.pgFdrId,
                 warrantyPeriodMonths: dto.warrantyPeriodMonths,
                 warrantyPeriodYears: dto.warrantyPeriodYears,
@@ -275,13 +317,31 @@ export class LoaService {
                 paymentPending: dto.paymentPending,
             };
 
-            // Update the LOA
-            const updatedLoa = await this.repository.update(id, updateData);
+            // ==========================
+            // STEP 9: Execute Update
+            // ==========================
+            const updated = await this.repository.update(id, updateData);
+            return ResultUtils.ok(updated);
 
-            return ResultUtils.ok(updatedLoa);
-        } catch (error) {
-            console.error('LOA Update Error:', error);
-            return ResultUtils.fail('Failed to update LOA record');
+        } catch (error: any) {
+            console.error("LOA Update Error:", error);
+
+            // Prisma duplication
+            if (error.code === "P2002") {
+                return ResultUtils.fail("Duplicate value — ensure LOA number & FDRs are unique");
+            }
+
+            // Missing required relational record
+            if (error.code === "P2025") {
+                return ResultUtils.fail("Update failed — required related record missing");
+            }
+
+            // FK constraint failed
+            if (error.code === "P2003") {
+                return ResultUtils.fail("Invalid reference — relation entity does not exist");
+            }
+
+            return ResultUtils.fail(error.message || "Unexpected server error occurred");
         }
     }
 
@@ -291,17 +351,17 @@ export class LoaService {
             if (!idValidation.isSuccess) {
                 return ResultUtils.fail('Invalid ID format');
             }
-    
+
             const loa = await this.repository.findById(id);
             if (!loa) {
                 return ResultUtils.fail('LOA not found');
             }
-    
+
             // Check if LOA has any purchase orders
             if (loa.purchaseOrders && loa.purchaseOrders.length > 0) {
                 return ResultUtils.fail('Cannot delete LOA with associated purchase orders');
             }
-    
+
             // First delete all amendments associated with this LOA
             if (loa.amendments && loa.amendments.length > 0) {
                 for (const amendment of loa.amendments) {
@@ -312,12 +372,12 @@ export class LoaService {
                     await this.repository.deleteAmendment(amendment.id);
                 }
             }
-    
+
             // Delete LOA document if exists
             // if (loa.documentUrl) {
             //     await this.storageService.deleteDocument(loa.documentUrl);
             // }
-    
+
             // Finally delete the LOA
             await this.repository.delete(id);
             return ResultUtils.ok(undefined);
@@ -432,8 +492,8 @@ export class LoaService {
 
             let tags: string[] = [];
             if (dto.tags) {
-                tags = typeof dto.tags === 'string' 
-                    ? JSON.parse(dto.tags) 
+                tags = typeof dto.tags === 'string'
+                    ? JSON.parse(dto.tags)
                     : dto.tags;
             }
 
@@ -457,7 +517,7 @@ export class LoaService {
             if (!existingAmendment) {
                 return ResultUtils.fail('Amendment not found');
             }
-    
+
             let documentUrl = existingAmendment.documentUrl;
             if (dto.documentFile) {
                 const fileName = `amendments/${existingAmendment.loaId}/${crypto.randomUUID()}${path.extname(dto.documentFile.originalname)}`;
@@ -467,20 +527,20 @@ export class LoaService {
                     dto.documentFile.mimetype
                 );
             }
-    
+
             let tags = existingAmendment.tags;
             if (dto.tags) {
-                tags = typeof dto.tags === 'string' 
-                    ? JSON.parse(dto.tags) 
+                tags = typeof dto.tags === 'string'
+                    ? JSON.parse(dto.tags)
                     : dto.tags;
             }
-    
+
             const updatedAmendment = await this.repository.updateAmendment(id, {
                 amendmentNumber: dto.amendmentNumber || existingAmendment.amendmentNumber,
                 documentUrl,
                 tags
             });
-    
+
             return ResultUtils.ok(updatedAmendment);
         } catch (error) {
             console.error('Amendment Update Error:', error);
@@ -589,14 +649,14 @@ export class LoaService {
     async updateStatus(id: string, dto: UpdateStatusDto): Promise<Result<any>> {
         try {
             console.log(`Starting status update for LOA ${id} to status ${dto.status}`);
-            
+
             // Step 1: Validate the input data
             const validationResult = this.validator.validateStatusUpdate(dto);
             if (!validationResult.isSuccess) {
                 console.log('Validation processing failed');
                 return ResultUtils.fail('Validation processing failed');
             }
-            
+
             if (validationResult.data && validationResult.data.length > 0) {
                 console.log('Validation errors:', validationResult.data);
                 return ResultUtils.fail('Validation failed', validationResult.data);
@@ -615,7 +675,7 @@ export class LoaService {
                 console.log('LOA not found');
                 return ResultUtils.fail('LOA not found');
             }
-            
+
             console.log(`Found LOA: ${existingLoa.loaNumber} with current status: ${existingLoa.status || 'undefined'}`);
 
             // Step 4: Update the status
@@ -623,7 +683,7 @@ export class LoaService {
             const updatedLoa = await this.repository.update(id, {
                 status: dto.status
             });
-            
+
             console.log(`Status updated successfully. New status: ${updatedLoa.status || 'undefined'}`);
 
             return ResultUtils.ok(updatedLoa);

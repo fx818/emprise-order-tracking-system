@@ -37,7 +37,7 @@ export interface CreateFdrDto {
   offerId?: string;
 
   // Status
-  status?: 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'RETURNED';
+  status?: 'RUNNING' | 'AVAILABLE_FOR_RELEASE' | 'CANCELLED' | 'RETURNED';
 
   tags?: string[] | string;
 }

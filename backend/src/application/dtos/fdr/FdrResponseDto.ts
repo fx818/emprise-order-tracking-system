@@ -31,7 +31,7 @@ export interface FdrResponseDto {
   extractedData?: any;
 
   // Status
-  status: 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'RETURNED';
+  status: 'RUNNING' | 'AVAILABLE_FOR_RELEASE' | 'CANCELLED' | 'RETURNED';
 
   // Relations
   offer?: {

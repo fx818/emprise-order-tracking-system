@@ -156,7 +156,7 @@ export class LoaController {
       }
 
       // Parse loaValue as number if present
-      const loaValue = req.body.loaValue ? Number(req.body.loaValue) : undefined;
+      // const loaValue = req.body.loaValue ? Number(req.body.loaValue) : undefined;
 
       // Process the uploaded files
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -176,13 +176,25 @@ export class LoaController {
         (req.body.hasPg === 'true' || req.body.hasPg === true) :
         undefined;
 
+
+      const parseOptionalNumber = (val: any): number | undefined => {
+        if (val === undefined || val === null || val === '' || val === 'null') return undefined;
+
+        const num = Number(val);
+        return isNaN(num) ? undefined : num;
+      };
+
+
+
       // Parse amount values if present
-      const emdAmount = req.body.emdAmount ? Number(req.body.emdAmount) : undefined;
-      const recoverablePending = req.body.recoverablePending ? Number(req.body.recoverablePending) : undefined;
-      const paymentPending = req.body.paymentPending ? Number(req.body.paymentPending) : undefined;
-      const manualTotalBilled = req.body.manualTotalBilled ? Number(req.body.manualTotalBilled) : undefined;
-      const manualTotalReceived = req.body.manualTotalReceived ? Number(req.body.manualTotalReceived) : undefined;
-      const manualTotalDeducted = req.body.manualTotalDeducted ? Number(req.body.manualTotalDeducted) : undefined;
+      const emdAmount = parseOptionalNumber(req.body.emdAmount);
+      const recoverablePending = parseOptionalNumber(req.body.recoverablePending);
+      const paymentPending = parseOptionalNumber(req.body.paymentPending);
+      const manualTotalBilled = parseOptionalNumber(req.body.manualTotalBilled);
+      const manualTotalReceived = parseOptionalNumber(req.body.manualTotalReceived);
+      const manualTotalDeducted = parseOptionalNumber(req.body.manualTotalDeducted);
+      const loaValue = parseOptionalNumber(req.body.loaValue);
+
 
       const result = await this.service.updateLoa(id, {
         loaNumber: req.body.loaNumber,
@@ -247,8 +259,8 @@ export class LoaController {
     }
   };
 
-  
-  
+
+
   deleteLoa = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

@@ -117,6 +117,7 @@ export function FDRDetail() {
     if (!id) return;
     try {
       setIsUpdatingStatus(true);
+      console.log('Sending ', status)
       await updateFDRStatus(id, status);
       await fetchFDRDetails();
       showSuccess(`FDR marked as ${status}`);
@@ -176,13 +177,13 @@ export function FDRDetail() {
             <>
               <Button
                 variant="outline"
-                onClick={() => handleStatusUpdate("COMPLETED")}
+                onClick={() => handleStatusUpdate("AVAILABLE_FOR_RELEASE")}
                 disabled={isUpdatingStatus}
               >
                 {isUpdatingStatus && (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 )}
-                Mark as Completed
+                Mark as Available for release
               </Button>
               <Button
                 variant="outline"

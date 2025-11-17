@@ -56,7 +56,7 @@ import {
 const statusOptions = [
   { label: "All Status", value: "all" },
   { label: "Running", value: "RUNNING" },
-  { label: "Completed", value: "COMPLETED" },
+  { label: "Available for release", value: "AVAILABLE_FOR_RELEASE" },
   { label: "Cancelled", value: "CANCELLED" },
   { label: "Returned", value: "RETURNED" },
 ];

@@ -53,7 +53,7 @@ const getStatusColor = (status: string): 'default' | 'secondary' | 'destructive'
   switch (status) {
     case 'RUNNING':
       return 'default';
-    case 'COMPLETED':
+    case 'AVAILABLE_FOR_RELEASE':
       return 'secondary';
     case 'CANCELLED':
       return 'destructive';

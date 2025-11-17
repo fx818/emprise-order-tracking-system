@@ -33,7 +33,7 @@ export interface LOA {
     otherDocuments?: OtherDocument[];
 
     remarks?: string;
-    tenderNo?: string;
+    
     orderPOC?: string;
     pocId?: string;
     poc?: {
@@ -45,6 +45,19 @@ export interface LOA {
     inspectionAgency?: {
         id: string;
         name: string;
+    };
+
+    // 🔗 Tender
+    tenderNo?: string;
+    tenderId?: string | null;
+    tender?: {
+        id: string;
+        tenderNumber: string;
+        tenderDescription?: string;
+        hasEMD: boolean;
+        emdAmount?: number;
+        createdAt: Date;
+        updatedAt: Date;
     };
 
     fdBgDetails?: string;

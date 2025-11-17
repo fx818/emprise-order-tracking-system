@@ -227,7 +227,7 @@ const excelUpload = multer({
 // Setup routes
 export function loaRoutes(controller: LoaController) {
   const router = Router();
-  
+
   // Create LOA
   router.post(
     '/',
@@ -259,9 +259,12 @@ export function loaRoutes(controller: LoaController) {
     '/:id',
     authMiddleware([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF]),
     upload.fields([
-      { name: 'documentFile', maxCount: 1 },
-      { name: 'securityDepositFile', maxCount: 1 },
-      { name: 'performanceGuaranteeFile', maxCount: 1 }
+      { name: "documentFile", maxCount: 1 },
+      { name: "securityDepositFile", maxCount: 1 },
+      { name: "performanceGuaranteeFile", maxCount: 1 },
+      { name: "invoicePdfFile", maxCount: 1 },
+      { name: "billPdfFile", maxCount: 1 },
+      { name: "otherDocuments", maxCount: 10 }
     ]),
     controller.updateLoa
   );

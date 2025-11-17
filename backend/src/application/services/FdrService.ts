@@ -11,7 +11,7 @@ import { UpdateFdrDto } from '../dtos/fdr/UpdateFdrDto';
 import { Result, ResultUtils } from '../../shared/types/common.types';
 import { FdrCalculations } from '../../domain/entities/utils/FdrCalculations';
 import { AppError } from '../../shared/errors/AppError';
-
+const openRouterApiKeynew = process.env.OPENROUTER_API_KEY || undefined;
 /**
  * FdrService
  *
@@ -23,9 +23,10 @@ export class FdrService {
     private repository: PrismaFdrRepository,
     private storageService: S3Service,
     private ocrService: OCRService,
-    private openRouterApiKey?: string
+    private openRouterApiKey?: string,
   ) {}
 
+  
   /**
    * Process document file - upload to S3
    * - Validates file
@@ -111,7 +112,7 @@ export class FdrService {
       return ResultUtils.fail('No extracted text provided for AI extraction');
     }
 
-    if (!this.openRouterApiKey) {
+    if (!openRouterApiKeynew) {
       console.error('[FdrService] OpenRouter API key missing');
       return ResultUtils.fail('AI service not configured (OpenRouter key missing)');
     }
@@ -153,7 +154,7 @@ Text: ${data.extractedText}`;
         response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${this.openRouterApiKey}`,
+            Authorization: `Bearer ${openRouterApiKeynew}`,
             'Content-Type': 'application/json',
             'HTTP-Referer': process.env.BACKEND_URL || 'http://localhost:3000',
             'X-Title': 'Emprise FDR Extractor',

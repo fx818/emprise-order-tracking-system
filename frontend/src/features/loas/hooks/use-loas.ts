@@ -9,7 +9,7 @@ export function useLOAs() {
 
   const handleError = (error: any, defaultMessage: string) => {
     console.error('API Error:', error);
-    
+
     if (error?.response?.data?.message) {
       showError(error.response.data.message);
     } else if (error?.code === 'P2002') {
@@ -18,7 +18,7 @@ export function useLOAs() {
     } else {
       showError(defaultMessage);
     }
-    
+
     throw error;
   };
 
@@ -95,14 +95,14 @@ export function useLOAs() {
     try {
       setLoading(true);
       const response = await apiClient.get(`/loas/${id}`);
-      
+
       const loaData = response.data.data;
 
       // Ensure status is present in the response
       if (!loaData.status) {
         loaData.status = "NOT_STARTED"; // Default to NOT_STARTED if status is missing
       }
-      
+
       return loaData;
     } catch (error: any) {
       showError(error.response?.data?.message || 'Failed to fetch LOA details');
@@ -117,47 +117,85 @@ export function useLOAs() {
       setLoading(true);
 
       const formData = new FormData();
+
+
+      // Build LOA form data safely
       Object.entries(data).forEach(([key, value]) => {
-        if (key === 'documentFile' && value) {
-          formData.append(key, value);
-        } else if (key === 'securityDepositFile' && value && data.hasSd) {
-          formData.append(key, value);
-        } else if (key === 'performanceGuaranteeFile' && value && data.hasPg) {
-          formData.append(key, value);
-        } else if (key === 'invoicePdfFile' && value) {
-          formData.append(key, value);
-        } else if (key === 'deliveryPeriod') {
-          formData.append(key, JSON.stringify(value));
-        } else if (key === 'tags') {
-          const uniqueTags = Array.from(new Set(value))
-            .map((tag: any) => tag.trim())
-            .filter(Boolean);
-          formData.append(key, JSON.stringify(uniqueTags));
-        } else if (key === 'hasEmd' || key === 'hasSd' || key === 'hasPg') {
-          formData.append(key, String(value));
-        } else if (key === 'emdAmount' && data.hasEmd) {
-          formData.append(key, String(value || 0));
-        } else if (key === 'securityDepositAmount' && data.hasSd) {
-          formData.append(key, String(value || 0));
-        } else if (key === 'performanceGuaranteeAmount' && data.hasPg) {
-          formData.append(key, String(value || 0));
-        } else if (key === 'invoiceAmount' || key === 'totalReceivables' || key === 'actualAmountReceived' ||
-                   key === 'amountDeducted' || key === 'amountPending') {
-          // Handle invoice amount fields - only append if they have a value
-          if (value !== null && value !== undefined && value !== '') {
-            formData.append(key, String(value));
-          }
-        } else if (value !== null && value !== undefined && value !== '') {
-          formData.append(key, String(value));
+        // Skip only `undefined` — NOT null, NOT 0
+        if (value === undefined) return;
+
+        // Files
+        if (key === "documentFile" && value instanceof File) {
+          formData.append("documentFile", value);
+          return;
         }
+
+        // Delivery Period
+        if (key === "deliveryPeriod" && typeof value === "object") {
+          const formatted = {
+            start: value.start instanceof Date ? value.start.toISOString() : value.start,
+            end: value.end instanceof Date ? value.end.toISOString() : value.end,
+          };
+          formData.append("deliveryPeriod", JSON.stringify(formatted));
+          return;
+        }
+
+        // Tags
+        if (key === "tags" && Array.isArray(value)) {
+          formData.append("tags", JSON.stringify(value.filter(tag => tag?.trim())));
+          return;
+        }
+
+        // Boolean / ID handling (including FDR)
+        if (["hasEmd", "hasSd", "hasPg", "sdFdrId", "pgFdrId"].includes(key)) {
+          formData.append(key, String(value));
+          return;
+        }
+
+        // Warranty fields must allow null and 0
+        if (["warrantyPeriodMonths", "warrantyPeriodYears"].includes(key)) {
+          formData.append(key, value === null ? "" : String(value));
+          return;
+        }
+
+        if (["warrantyStartDate", "warrantyEndDate"].includes(key)) {
+          formData.append(
+            key,
+            value ? (value instanceof Date ? value.toISOString() : value) : ""
+          );
+          return;
+        }
+
+        /** ---------- DATES ---------- */
+        if (["dueDate", "orderReceivedDate"].includes(key)) {
+          formData.append(key, value ? new Date(value as any).toISOString() : "");
+          return;
+        }
+
+        if (key === "pocId") {
+          formData.append("pocId", value || "");
+          return;
+        }
+
+        if (key === "inspectionAgencyId") {
+          formData.append("inspectionAgencyId", value || "");
+          return;
+        }
+
+
+        // Default
+        formData.append(key, String(value));
       });
+
+
+
 
       const response = await apiClient.post('/loas', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       // The server response from LoaController
       // Check if the response has a status field (indicating it's in the new format)
       if (response.data && response.data.status === 'success') {
@@ -184,7 +222,7 @@ export function useLOAs() {
     try {
       setLoading(true);
       const formData = new FormData();
-    
+
       Object.entries(data).forEach(([key, value]) => {
         if (key === 'documentFile' && value) {
           formData.append(key, value);
@@ -203,7 +241,7 @@ export function useLOAs() {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       showSuccess('Amendment created successfully');
       return response.data.data;
     } catch (error: any) {
@@ -227,61 +265,184 @@ export function useLOAs() {
     }
   };
 
+  // const updateLOA = async (id: string, data: Partial<LOAFormData> & { status?: string }) => {
+  //   try {
+  //     setLoading(true);
+
+  //     const formData = new FormData();
+  //     Object.entries(data).forEach(([key, value]) => {
+  //       if (key === 'documentFile' && value) {
+  //         formData.append(key, value);
+  //       } else if (key === 'securityDepositFile' && value && data.hasSd) {
+  //         formData.append(key, value);
+  //       } else if (key === 'performanceGuaranteeFile' && value && data.hasPg) {
+  //         formData.append(key, value);
+  //       } else if (key === 'invoicePdfFile' && value) {
+  //         // formData.append(key, value);
+  //         return;
+  //       } else if (key === 'deliveryPeriod') {
+  //         const formattedPeriod = {
+  //           start: value.start instanceof Date ? value.start.toISOString() : value.start,
+  //           end: value.end instanceof Date ? value.end.toISOString() : value.end
+  //         };
+  //         formData.append(key, JSON.stringify(formattedPeriod));
+  //       } else if (key === 'tags') {
+  //         let tagsToSend = [];
+  //         if (Array.isArray(value)) {
+  //           tagsToSend = value.filter(tag => tag && tag.trim()).map(tag => tag.trim());
+  //         }
+  //         formData.append(key, JSON.stringify(tagsToSend));
+  //       } else if (key === 'hasEmd' || key === 'hasSd' || key === 'hasPg') {
+  //         formData.append(key, String(value));
+  //       } else if (key === 'emdAmount' && data.hasEmd) {
+  //         formData.append(key, String(value || 0));
+  //       } else if (key === 'securityDepositAmount' && data.hasSd) {
+  //         formData.append(key, String(value || 0));
+  //       } else if (key === 'performanceGuaranteeAmount' && data.hasPg) {
+  //         formData.append(key, String(value || 0));
+  //       } else if (key === 'invoiceAmount' || key === 'totalReceivables' || key === 'actualAmountReceived' ||
+  //                  key === 'amountDeducted' || key === 'amountPending') {
+  //         // Handle invoice amount fields - only append if they have a value
+  //         if (value !== null && value !== undefined && value !== '') {
+  //           formData.append(key, String(value));
+  //         }
+  //       } else if (value !== null && value !== undefined && value !== '') {
+  //         formData.append(key, String(value));
+  //       }
+  //     });
+
+  //     const response = await apiClient.put(`/loas/${id}`, formData, {
+  //       headers: {
+  //         'Content-Type': 'multipart/form-data',
+  //       },
+  //     });
+
+  //     console.log('updateLOA response:', response);
+
+  //     showSuccess('LOA updated successfully');
+  //     return response.data.data;
+  //   } catch (error: any) {
+  //     handleError(error, 'Failed to update LOA');
+  //     throw error;
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const updateLOA = async (id: string, data: Partial<LOAFormData> & { status?: string }) => {
     try {
       setLoading(true);
 
       const formData = new FormData();
+
+      // Build LOA form data safely
       Object.entries(data).forEach(([key, value]) => {
-        if (key === 'documentFile' && value) {
-          formData.append(key, value);
-        } else if (key === 'securityDepositFile' && value && data.hasSd) {
-          formData.append(key, value);
-        } else if (key === 'performanceGuaranteeFile' && value && data.hasPg) {
-          formData.append(key, value);
-        } else if (key === 'invoicePdfFile' && value) {
-          formData.append(key, value);
-        } else if (key === 'deliveryPeriod') {
-          const formattedPeriod = {
-            start: value.start instanceof Date ? value.start.toISOString() : value.start,
-            end: value.end instanceof Date ? value.end.toISOString() : value.end
-          };
-          formData.append(key, JSON.stringify(formattedPeriod));
-        } else if (key === 'tags') {
-          let tagsToSend = [];
-          if (Array.isArray(value)) {
-            tagsToSend = value.filter(tag => tag && tag.trim()).map(tag => tag.trim());
-          }
-          formData.append(key, JSON.stringify(tagsToSend));
-        } else if (key === 'hasEmd' || key === 'hasSd' || key === 'hasPg') {
-          formData.append(key, String(value));
-        } else if (key === 'emdAmount' && data.hasEmd) {
-          formData.append(key, String(value || 0));
-        } else if (key === 'securityDepositAmount' && data.hasSd) {
-          formData.append(key, String(value || 0));
-        } else if (key === 'performanceGuaranteeAmount' && data.hasPg) {
-          formData.append(key, String(value || 0));
-        } else if (key === 'invoiceAmount' || key === 'totalReceivables' || key === 'actualAmountReceived' ||
-                   key === 'amountDeducted' || key === 'amountPending') {
-          // Handle invoice amount fields - only append if they have a value
-          if (value !== null && value !== undefined && value !== '') {
-            formData.append(key, String(value));
-          }
-        } else if (value !== null && value !== undefined && value !== '') {
-          formData.append(key, String(value));
+        // Skip only `undefined` — NOT null, NOT 0
+        if (value === undefined) return;
+
+        // Files
+        if (key === "documentFile" && value instanceof File) {
+          formData.append("documentFile", value);
+          return;
         }
+
+        // Delivery Period
+        if (key === "deliveryPeriod" && typeof value === "object") {
+          const formatted = {
+            start: value.start instanceof Date ? value.start.toISOString() : value.start,
+            end: value.end instanceof Date ? value.end.toISOString() : value.end,
+          };
+          formData.append("deliveryPeriod", JSON.stringify(formatted));
+          return;
+        }
+
+        // Tags
+        if (key === "tags" && Array.isArray(value)) {
+          formData.append("tags", JSON.stringify(value.filter(tag => tag?.trim())));
+          return;
+        }
+
+        // Boolean / ID handling (including FDR)
+        if (["hasEmd", "hasSd", "hasPg", "sdFdrId", "pgFdrId"].includes(key)) {
+          formData.append(key, String(value));
+          return;
+        }
+
+        // Warranty fields must allow null and 0
+        if (["warrantyPeriodMonths", "warrantyPeriodYears"].includes(key)) {
+          formData.append(key, value === null ? "" : String(value));
+          return;
+        }
+
+        if (["warrantyStartDate", "warrantyEndDate"].includes(key)) {
+          formData.append(
+            key,
+            value ? (value instanceof Date ? value.toISOString() : value) : ""
+          );
+          return;
+        }
+
+        /** ---------- DATES ---------- */
+        if (["dueDate", "orderReceivedDate"].includes(key)) {
+          formData.append(key, value ? new Date(value as any).toISOString() : "");
+          return;
+        }
+
+        if (key === "pocId") {
+          formData.append("pocId", value || "");
+          return;
+        }
+
+        if (key === "inspectionAgencyId") {
+          formData.append("inspectionAgencyId", value || "");
+          return;
+        }
+
+
+        // Default
+        formData.append(key, String(value));
       });
 
+
+
+      // --- STEP 1: UPDATE LOA ---
       const response = await apiClient.put(`/loas/${id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      showSuccess('LOA updated successfully');
+      // DEBUG: print FormData entries
+      for (let pair of formData.entries()) {
+        console.log("FD:", pair[0], pair[1]);
+      }
+
+
+      // --- STEP 2: AUTO CREATE BILL IF REQUIRED ---
+
+      const hasInvoiceData =
+        !!data.invoiceNumber ||
+        !!data.invoiceAmount ||
+        !!data.invoicePdfFile;
+
+      if (hasInvoiceData) {
+        const billFormData = new FormData();
+
+        if (data.invoiceNumber) billFormData.append("invoiceNumber", data.invoiceNumber);
+        if (data.invoiceAmount) billFormData.append("invoiceAmount", String(data.invoiceAmount));
+        if (data.billLinks) billFormData.append("billLinks", data.billLinks);
+        if (data.invoicePdfFile instanceof File) {
+          billFormData.append("invoicePdfFile", data.invoicePdfFile);
+        }
+
+        await apiClient.post(`/loas/${id}/bills`, billFormData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      showSuccess("LOA updated successfully");
       return response.data.data;
+
     } catch (error: any) {
-      handleError(error, 'Failed to update LOA');
+      handleError(error, "Failed to update LOA");
       throw error;
     } finally {
       setLoading(false);
@@ -336,10 +497,9 @@ export function useLOAs() {
       // Show summary message
       if (result.successCount > 0) {
         showSuccess(
-          `Import completed: ${result.successCount} LOAs created successfully${
-            result.failureCount > 0 || result.skippedCount > 0
-              ? `, ${result.failureCount} failed, ${result.skippedCount} skipped`
-              : ''
+          `Import completed: ${result.successCount} LOAs created successfully${result.failureCount > 0 || result.skippedCount > 0
+            ? `, ${result.failureCount} failed, ${result.skippedCount} skipped`
+            : ''
           }`
         );
       } else {

@@ -7,33 +7,45 @@ export interface UpdateLoaDto {
     dueDate?: string;
     orderReceivedDate?: string;
     workDescription?: string;
+
+    // 📁 File uploads (full list)
     documentFile?: Express.Multer.File;
+    securityDepositFile?: Express.Multer.File;
+    performanceGuaranteeFile?: Express.Multer.File;
+    invoicePdfFile?: Express.Multer.File;  // <-- ADD THIS
+
     tags?: string[];
     siteId?: string;
     status?: string;
     remarks?: string;
+
     tenderNo?: string;
     tenderId?: string;
     orderPOC?: string;
     pocId?: string;
     inspectionAgencyId?: string;
     fdBgDetails?: string;
-    // EMD fields
+
+    // 💰 EMD fields
     hasEmd?: boolean;
     emdAmount?: number;
-    // FDR linking - link/update existing FDR records
+
+    // 💰 FDR linking
     hasSd?: boolean;
     sdFdrId?: string | null;
     hasPg?: boolean;
     pgFdrId?: string | null;
-    // Pending breakdown fields
+
+    // 📊 Pending breakdown
     recoverablePending?: number;
     paymentPending?: number;
-    // Manual override fields (for historical data entry)
+
+    // 🏦 Manual financial overrides
     manualTotalBilled?: number;
     manualTotalReceived?: number;
     manualTotalDeducted?: number;
-    // Warranty fields
+
+    // 🛠️ Warranty fields
     warrantyPeriodMonths?: number;
     warrantyPeriodYears?: number;
     warrantyStartDate?: string;

@@ -9,7 +9,9 @@ export interface LOA {
     };
     dueDate?: Date;
     orderReceivedDate?: Date;
+
     status?: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'DELAYED';
+
     site?: {
         id: string;
         name: string;
@@ -21,12 +23,15 @@ export interface LOA {
             headquarters: string;
         };
     };
+
     siteId: string;
     workDescription: string;
     documentUrl: string;
+
     amendments?: Amendment[];
-    invoices?: any[]; // Invoice records for billing
+    invoices?: any[];
     otherDocuments?: OtherDocument[];
+
     remarks?: string;
     tenderNo?: string;
     orderPOC?: string;
@@ -35,29 +40,38 @@ export interface LOA {
         id: string;
         name: string;
     };
+
     inspectionAgencyId?: string;
     inspectionAgency?: {
         id: string;
         name: string;
     };
+
     fdBgDetails?: string;
+
     hasEmd: boolean;
     emdAmount?: number;
+
     hasSd: boolean;
     sdFdrId?: string;
+
     hasPg: boolean;
     pgFdrId?: string;
+
+    // 💰 Financial tracking
     recoverablePending: number;
     paymentPending: number;
-    // Manual override fields (for historical data entry)
+
     manualTotalBilled?: number;
     manualTotalReceived?: number;
     manualTotalDeducted?: number;
-    // Calculated fields (populated from invoices)
+
     totalBilled?: number;
     totalReceived?: number;
     totalDeducted?: number;
     totalPending?: number;
+
+    // 🛡️ FDR Links
     sdFdr?: {
         id: string;
         bankName: string;
@@ -69,6 +83,7 @@ export interface LOA {
         status: string;
         category: string;
     };
+
     pgFdr?: {
         id: string;
         bankName: string;
@@ -80,6 +95,7 @@ export interface LOA {
         status: string;
         category: string;
     };
+
     generalFdrs?: {
         id: string;
         bankName: string;
@@ -97,10 +113,20 @@ export interface LOA {
             email: string;
         };
     }[];
+
+    // 🏷️ Tags
     tags: string[];
+
+    // 🔧 Warranty fields (NEW)
+    warrantyPeriodMonths?: number | null;
+    warrantyPeriodYears?: number | null;
+    warrantyStartDate?: Date | null;
+    warrantyEndDate?: Date | null;
+
     createdAt: Date;
     updatedAt: Date;
 }
+
 
 export interface Amendment {
     id: string;

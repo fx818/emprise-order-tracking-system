@@ -124,7 +124,6 @@ export function useBills() {
           'Content-Type': 'multipart/form-data',
         },
       });
-
       showSuccess('Bill updated successfully');
       return response.data;
     } catch (error: any) {

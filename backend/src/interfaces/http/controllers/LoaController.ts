@@ -2,12 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { LoaService } from '../../../application/services/LOAService';
 import { BulkImportService } from '../../../application/services/BulkImportService';
 import { AppError } from '../../../shared/errors/AppError';
+import { UpdateLoaDto } from '../../../application/dtos/loa/UpdateLoaDto';
+import { CreateLoaDto } from '../../../application/dtos/loa/CreateLoaDto';
 
 export class LoaController {
   constructor(
     private service: LoaService,
     private bulkImportService: BulkImportService
-  ) {}
+  ) { }
 
   createLoa = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -40,7 +42,6 @@ export class LoaController {
 
       // Process the uploaded files
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      
       // Access the document file
       const documentFile = files?.documentFile?.[0];
       const securityDepositFile = files?.securityDepositFile?.[0];
@@ -86,6 +87,9 @@ export class LoaController {
         warrantyPeriodYears: req.body.warrantyPeriodYears ? Number(req.body.warrantyPeriodYears) : undefined,
         warrantyStartDate: req.body.warrantyStartDate,
         warrantyEndDate: req.body.warrantyEndDate,
+        // Date fields
+        dueDate: req.body.dueDate,
+        orderReceivedDate: req.body.orderReceivedDate,
         // Pending breakdown fields
         recoverablePending,
         paymentPending,
@@ -156,7 +160,6 @@ export class LoaController {
 
       // Process the uploaded files
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      
       // Access the document file
       const documentFile = files?.documentFile?.[0];
       const securityDepositFile = files?.securityDepositFile?.[0];
@@ -209,6 +212,9 @@ export class LoaController {
         warrantyPeriodYears: req.body.warrantyPeriodYears ? Number(req.body.warrantyPeriodYears) : undefined,
         warrantyStartDate: req.body.warrantyStartDate,
         warrantyEndDate: req.body.warrantyEndDate,
+        // Date fields
+        dueDate: req.body.dueDate,
+        orderReceivedDate: req.body.orderReceivedDate,
         // Pending breakdown fields
         recoverablePending,
         paymentPending,
@@ -240,6 +246,8 @@ export class LoaController {
       next(error);
     }
   };
+
+  
   
   deleteLoa = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -247,7 +255,7 @@ export class LoaController {
       const result = await this.service.deleteLoa(id);
 
       if (!result.isSuccess) {
-        const errorMessage = Array.isArray(result.error) 
+        const errorMessage = Array.isArray(result.error)
           ? result.error[0]?.message || 'Failed to delete LOA'
           : result.error || 'Failed to delete LOA';
         throw new AppError(errorMessage);
@@ -341,7 +349,7 @@ export class LoaController {
       });
 
       if (!result.isSuccess) {
-        const errorMessage = Array.isArray(result.error) 
+        const errorMessage = Array.isArray(result.error)
           ? result.error[0]?.message || 'Failed to create amendment'
           : result.error || 'Failed to create amendment';
         throw new AppError(errorMessage);
@@ -365,7 +373,7 @@ export class LoaController {
       });
 
       if (!result.isSuccess) {
-        const errorMessage = Array.isArray(result.error) 
+        const errorMessage = Array.isArray(result.error)
           ? result.error[0]?.message || 'Failed to update amendment'
           : result.error || 'Failed to update amendment';
         throw new AppError(errorMessage);

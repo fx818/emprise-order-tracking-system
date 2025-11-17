@@ -4,7 +4,7 @@ import { DeliveryPeriod } from '../../../application/dtos/loa/CreateLoaDto';
 import { LOA, Amendment, OtherDocument } from '../../../domain/entities/LOA';
 
 export class PrismaLoaRepository {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: PrismaClient) { }
 
   private mapPrismaLoaToLoa(prismaLoa: PrismaLOA & {
     amendments: PrismaAmendment[];
@@ -57,6 +57,13 @@ export class PrismaLoaRepository {
         updatedAt: amendment.updatedAt,
         loaId: amendment.loaId
       })),
+
+      // 🛠️ Warranty fields (ADD THIS BLOCK)
+      warrantyPeriodMonths: prismaLoa.warrantyPeriodMonths ?? undefined,
+      warrantyPeriodYears: prismaLoa.warrantyPeriodYears ?? undefined,
+      warrantyStartDate: prismaLoa.warrantyStartDate ? new Date(prismaLoa.warrantyStartDate) : undefined,
+      warrantyEndDate: prismaLoa.warrantyEndDate ? new Date(prismaLoa.warrantyEndDate) : undefined,
+
       invoices: prismaLoa.invoices || [],
       otherDocuments: prismaLoa.otherDocuments?.map(doc => ({
         id: doc.id,
@@ -147,7 +154,6 @@ export class PrismaLoaRepository {
       updatedAt: prismaAmendment.updatedAt
     };
   }
-
   async create(data: {
     loaNumber: string;
     loaValue: number;
@@ -182,46 +188,70 @@ export class PrismaLoaRepository {
     manualTotalDeducted?: number;
   }): Promise<LOA> {
     try {
-      const prismaLoa = await this.prisma.lOA.create({
-        data: {
-          loaNumber: data.loaNumber,
-          loaValue: data.loaValue,
-          deliveryPeriod: {
-            start: new Date(data.deliveryPeriod.start),
-            end: new Date(data.deliveryPeriod.end)
-          },
-          workDescription: data.workDescription,
-          documentUrl: data.documentUrl,
-          tags: data.tags,
-          siteId: data.siteId,
-          tenderId: data.tenderId || null,
-          remarks: data.remarks || null,
-          tenderNo: data.tenderNo || null,
-          orderPOC: data.orderPOC || null,
-          pocId: data.pocId || null,
-          inspectionAgencyId: data.inspectionAgencyId || null,
-          fdBgDetails: data.fdBgDetails || null,
-          hasEmd: data.hasEmd || false,
-          emdAmount: data.emdAmount || null,
-          hasSd: data.hasSd || false,
-          sdFdrId: data.sdFdrId || null,
-          hasPg: data.hasPg || false,
-          pgFdrId: data.pgFdrId || null,
-          recoverablePending: data.recoverablePending || 0,
-          paymentPending: data.paymentPending || 0,
-          manualTotalBilled: data.manualTotalBilled || null,
-          manualTotalReceived: data.manualTotalReceived || null,
-          manualTotalDeducted: data.manualTotalDeducted || null
+
+      const createData: Prisma.LOACreateInput = {
+        loaNumber: data.loaNumber,
+        loaValue: data.loaValue,
+        deliveryPeriod: {
+          start: new Date(data.deliveryPeriod.start),
+          end: new Date(data.deliveryPeriod.end)
         },
+        workDescription: data.workDescription,
+        documentUrl: data.documentUrl,
+        tags: data.tags,
+        site: { connect: { id: data.siteId } },   // convert to relation connect
+        tenderNo: data.tenderNo || null,
+        remarks: data.remarks || null,
+        orderPOC: data.orderPOC || null,
+        fdBgDetails: data.fdBgDetails || null,
+        hasEmd: data.hasEmd || false,
+        emdAmount: data.emdAmount || null,
+        hasSd: data.hasSd || false,
+        hasPg: data.hasPg || false,
+        warrantyPeriodMonths: data.warrantyPeriodMonths,
+        warrantyPeriodYears: data.warrantyPeriodYears,
+        warrantyStartDate: data.warrantyStartDate ? new Date(data.warrantyStartDate) : null,
+        warrantyEndDate: data.warrantyEndDate ? new Date(data.warrantyEndDate) : null,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        orderReceivedDate: data.orderReceivedDate ? new Date(data.orderReceivedDate) : null,
+        recoverablePending: data.recoverablePending ?? 0,
+        paymentPending: data.paymentPending ?? 0,
+        manualTotalBilled: data.manualTotalBilled ?? null,
+        manualTotalReceived: data.manualTotalReceived ?? null,
+        manualTotalDeducted: data.manualTotalDeducted ?? null
+      };
+
+      // Tender relation
+      if (data.tenderId) {
+        createData.tender = { connect: { id: data.tenderId } };
+      }
+
+      // POC relation
+      if (data.pocId) {
+        createData.poc = { connect: { id: data.pocId } };
+      }
+
+      // Inspection agency
+      if (data.inspectionAgencyId) {
+        createData.inspectionAgency = { connect: { id: data.inspectionAgencyId } };
+      }
+
+      // FDR Relations must use connect labels like update()
+      if (data.hasSd && data.sdFdrId) {
+        createData.sdFdr = { connect: { id: data.sdFdrId } };
+      }
+
+      if (data.hasPg && data.pgFdrId) {
+        createData.pgFdr = { connect: { id: data.pgFdrId } };
+      }
+
+      const created = await this.prisma.lOA.create({
+        data: createData,
         include: {
           amendments: true,
           purchaseOrders: true,
           invoices: true,
-          site: {
-            include: {
-              zone: true
-            }
-          },
+          site: { include: { zone: true } },
           tender: true,
           poc: true,
           inspectionAgency: true,
@@ -230,76 +260,137 @@ export class PrismaLoaRepository {
         }
       });
 
-      return this.mapPrismaLoaToLoa(prismaLoa);
+      return this.mapPrismaLoaToLoa(created);
+
     } catch (error) {
-      console.error('PrismaLoaRepository create error:', error);
+      console.error("Prisma LOA create error:", error);
       throw error;
     }
   }
 
+
+
   async update(id: string, data: any): Promise<LOA> {
-    // Convert plain object to Prisma update structure
     const updateData: Prisma.LOAUpdateInput = {};
 
-    // Only set fields that are defined
+    // ==========================
+    // BASIC FIELDS
+    // ==========================
     if (data.loaNumber !== undefined) updateData.loaNumber = data.loaNumber;
     if (data.loaValue !== undefined) updateData.loaValue = data.loaValue;
     if (data.workDescription !== undefined) updateData.workDescription = data.workDescription;
+
+    // File URL if updated
     if (data.documentUrl !== undefined) updateData.documentUrl = data.documentUrl;
-    if (data.tags) updateData.tags = { set: data.tags };
-    
-    // Add status field handling
+
+    // Tags
+    if (data.tags !== undefined) updateData.tags = { set: data.tags };
+
+    // Status
     if (data.status !== undefined) updateData.status = data.status;
-    
-    // Handle delivery period
+
+    // ==========================
+    // DELIVERY PERIOD
+    // ==========================
     if (data.deliveryPeriod) {
       updateData.deliveryPeriod = {
         start: new Date(data.deliveryPeriod.start),
         end: new Date(data.deliveryPeriod.end)
       };
     }
-    
-    // Handle optional EDM fields
+
+    // ==========================
+    // EMD
+    // ==========================
     if (data.hasEmd !== undefined) updateData.hasEmd = data.hasEmd;
     if (data.emdAmount !== undefined) updateData.emdAmount = data.emdAmount;
 
-    // Handle optional LOA fields
+    // ==========================
+    // WARRANTY
+    // ==========================
+    if (data.warrantyPeriodMonths !== undefined)
+      updateData.warrantyPeriodMonths = data.warrantyPeriodMonths;
+
+    if (data.warrantyPeriodYears !== undefined)
+      updateData.warrantyPeriodYears = data.warrantyPeriodYears;
+
+    if (data.warrantyStartDate !== undefined)
+      updateData.warrantyStartDate = data.warrantyStartDate
+        ? new Date(data.warrantyStartDate)
+        : null;
+
+    if (data.warrantyEndDate !== undefined)
+      updateData.warrantyEndDate = data.warrantyEndDate
+        ? new Date(data.warrantyEndDate)
+        : null;
+
+    // ==========================
+    // DATE FIELDS
+    // ==========================
+    if (data.dueDate !== undefined)
+      updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+
+    if (data.orderReceivedDate !== undefined)
+      updateData.orderReceivedDate = data.orderReceivedDate
+        ? new Date(data.orderReceivedDate)
+        : null;
+
+    // ==========================
+    // TEXT & OPTIONAL FIELDS
+    // ==========================
     if (data.remarks !== undefined) updateData.remarks = data.remarks;
     if (data.tenderNo !== undefined) updateData.tenderNo = data.tenderNo;
-    if (data.tenderId !== undefined) {
-      updateData.tender = data.tenderId ? { connect: { id: data.tenderId } } : { disconnect: true };
-    }
     if (data.orderPOC !== undefined) updateData.orderPOC = data.orderPOC;
-    if (data.pocId !== undefined) {
-      updateData.poc = data.pocId ? { connect: { id: data.pocId } } : { disconnect: true };
-    }
-    if (data.inspectionAgencyId !== undefined) {
-      updateData.inspectionAgency = data.inspectionAgencyId ? { connect: { id: data.inspectionAgencyId } } : { disconnect: true };
-    }
     if (data.fdBgDetails !== undefined) updateData.fdBgDetails = data.fdBgDetails;
-
-    // Handle pending split fields
     if (data.recoverablePending !== undefined) updateData.recoverablePending = data.recoverablePending;
     if (data.paymentPending !== undefined) updateData.paymentPending = data.paymentPending;
-
-    // Handle manual override fields
     if (data.manualTotalBilled !== undefined) updateData.manualTotalBilled = data.manualTotalBilled;
     if (data.manualTotalReceived !== undefined) updateData.manualTotalReceived = data.manualTotalReceived;
     if (data.manualTotalDeducted !== undefined) updateData.manualTotalDeducted = data.manualTotalDeducted;
 
+    // ==========================
+    // RELATIONS: Tender / POC / Agency
+    // ==========================
+    if (data.tenderId !== undefined)
+      updateData.tender = data.tenderId ? { connect: { id: data.tenderId } } : { disconnect: true };
+
+    if (data.pocId !== undefined)
+      updateData.poc = data.pocId ? { connect: { id: data.pocId } } : { disconnect: true };
+
+    if (data.inspectionAgencyId !== undefined)
+      updateData.inspectionAgency = data.inspectionAgencyId
+        ? { connect: { id: data.inspectionAgencyId } }
+        : { disconnect: true };
+
+    // ==========================
+    // FDR LINKING
+    // ==========================
+    if (data.hasSd !== undefined) updateData.hasSd = data.hasSd;
+    if (data.sdFdrId !== undefined) {
+      updateData.sdFdr = data.sdFdrId
+        ? { connect: { id: data.sdFdrId } }
+        : { disconnect: true };
+    }
+
+    if (data.hasPg !== undefined) updateData.hasPg = data.hasPg;
+    if (data.pgFdrId !== undefined) {
+      updateData.pgFdr = data.pgFdrId
+        ? { connect: { id: data.pgFdrId } }
+        : { disconnect: true };
+    }
+
+    // ==========================
+    // UPDATE QUERY
+    // ==========================
     try {
-      const prismaLoa = await this.prisma.lOA.update({
+      const updated = await this.prisma.lOA.update({
         where: { id },
         data: updateData,
         include: {
           amendments: true,
           purchaseOrders: true,
           invoices: true,
-          site: {
-            include: {
-              zone: true
-            }
-          },
+          site: { include: { zone: true } },
           tender: true,
           poc: true,
           inspectionAgency: true,
@@ -308,9 +399,9 @@ export class PrismaLoaRepository {
         }
       });
 
-      return this.mapPrismaLoaToLoa(prismaLoa);
+      return this.mapPrismaLoaToLoa(updated);
     } catch (error) {
-      console.error('PrismaLoaRepository update error:', error);
+      console.error('LOA update error:', error);
       throw error;
     }
   }
@@ -497,12 +588,14 @@ export class PrismaLoaRepository {
           { loaNumber: { contains: params.searchTerm, mode: 'insensitive' } },
           { workDescription: { contains: params.searchTerm, mode: 'insensitive' } },
           { tags: { has: params.searchTerm } },
-          { site: {
-            OR: [
-              { name: { contains: params.searchTerm, mode: 'insensitive' } },
-              { code: { contains: params.searchTerm, mode: 'insensitive' } }
-            ]
-          }}
+          {
+            site: {
+              OR: [
+                { name: { contains: params.searchTerm, mode: 'insensitive' } },
+                { code: { contains: params.searchTerm, mode: 'insensitive' } }
+              ]
+            }
+          }
         ]
       });
     }
@@ -611,12 +704,14 @@ export class PrismaLoaRepository {
           { loaNumber: { contains: params.searchTerm, mode: 'insensitive' } },
           { workDescription: { contains: params.searchTerm, mode: 'insensitive' } },
           { tags: { has: params.searchTerm } },
-          { site: {
-            OR: [
-              { name: { contains: params.searchTerm, mode: 'insensitive' } },
-              { code: { contains: params.searchTerm, mode: 'insensitive' } }
-            ]
-          }}
+          {
+            site: {
+              OR: [
+                { name: { contains: params.searchTerm, mode: 'insensitive' } },
+                { code: { contains: params.searchTerm, mode: 'insensitive' } }
+              ]
+            }
+          }
         ]
       });
     }
@@ -640,10 +735,10 @@ export class PrismaLoaRepository {
             amendments: true,
             purchaseOrders: true,
             site: {
-          include: {
-            zone: true
-          }
-        }
+              include: {
+                zone: true
+              }
+            }
           }
         }
       }
@@ -668,10 +763,10 @@ export class PrismaLoaRepository {
             amendments: true,
             purchaseOrders: true,
             site: {
-          include: {
-            zone: true
-          }
-        }
+              include: {
+                zone: true
+              }
+            }
           }
         }
       }
@@ -689,10 +784,10 @@ export class PrismaLoaRepository {
             amendments: true,
             purchaseOrders: true,
             site: {
-          include: {
-            zone: true
-          }
-        }
+              include: {
+                zone: true
+              }
+            }
           }
         }
       }
@@ -710,10 +805,10 @@ export class PrismaLoaRepository {
             amendments: true,
             purchaseOrders: true,
             site: {
-          include: {
-            zone: true
-          }
-        }
+              include: {
+                zone: true
+              }
+            }
           }
         }
       }

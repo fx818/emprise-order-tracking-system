@@ -269,6 +269,8 @@ export class LoaService {
                 warrantyPeriodYears: dto.warrantyPeriodYears,
                 warrantyStartDate: dto.warrantyStartDate ? new Date(dto.warrantyStartDate) : undefined,
                 warrantyEndDate: dto.warrantyEndDate ? new Date(dto.warrantyEndDate) : undefined,
+                dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+                orderReceivedDate: dto.orderReceivedDate ? new Date(dto.orderReceivedDate) : undefined,
                 recoverablePending: dto.recoverablePending,
                 paymentPending: dto.paymentPending,
             };

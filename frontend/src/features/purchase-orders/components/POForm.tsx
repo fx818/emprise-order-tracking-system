@@ -867,10 +867,16 @@ export function POForm({ mode, initialData, onCancel, onSubmit }: POFormProps) {
 
 // Default terms and conditions template
 const defaultTermsAndConditions = `
-<ol>
-  <li>Delivery Timeline: All items must be delivered within the specified timeline.</li>
-  <li>Quality Standards: All items must meet the specified quality standards.</li>
-  <li>Payment Terms: Payment will be processed as per the agreed terms.</li>
-  <li>Warranty: Standard warranty terms apply as specified in the quotation.</li>
+<ol style="margin: 0.8mm 0 0 2mm; padding-left: 6mm;">
+  <li>Material should be compliant with respective specification mentioned above</li>
+  <li><b>Transportation:</b> Included in the rates above</li>
+  <li><b>Inspection:</b> By TPI</li>
+  <li>Internal Works Test Certificate (WTC) and Guarantee Certficate (GC) is a must. Provide all documents as per specifications.</li>
+  <li><b>Payment</b> as per existing terms</li>
+  <li><b>Packing:</b> As per Railway Standard Packing</li>
+  <li><b>Delivery Timeline:</b> Required to be sent in 3 equal lots every 6 months with 1st lot to be delivered in December 2025</li>
+  <li><b>Shelf Life:</b> To be minimum 12 months at the time of dispatch</li>
+  <li><b>Warranty:</b> As per Railway's PO Conditions</li>
+  <li>Rate will remain same during the entire period of the Order.</li>
 </ol>
 `;

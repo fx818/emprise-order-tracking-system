@@ -14,7 +14,10 @@ import { DocumentVerifierService } from '../../infrastructure/services/DocumentV
 import { PDFGenerationData, PurchaseOrder } from '../../domain/entities/PurchaseOrder';
 import { EmailService } from '../../infrastructure/services/EmailService';
 import { TokenService } from '../../infrastructure/services/TokenService';
-
+const baseURL_for_html = process.env.BACKEND_URL || 'http://localhost:3000';
+import fs from "fs";
+import path from "path";
+console.log("base url", baseURL_for_html)
 export class PurchaseOrderService {
   private validator: PurchaseOrderValidator;
 
@@ -199,6 +202,7 @@ export class PurchaseOrderService {
       throw new AppError('Failed to update purchase order');
     }
   }
+
   async deletePurchaseOrder(id: string, userId: string): Promise<void> {
     try {
       // 1️⃣ Validate existence
@@ -269,6 +273,40 @@ export class PurchaseOrderService {
       );
     }
   }
+  async markAsDeletedPurchaseOrder(id: string, userId: string): Promise<void> {
+    try {
+      const po = await this.repository.findById(id);
+      if (!po) throw new AppError('Purchase order not found or already deleted.', 404);
+
+      if (po.createdById !== userId)
+        throw new AppError('Only the creator can delete this purchase order.', 403);
+
+      if (po.status === POStatus.APPROVED)
+        throw new AppError('Approved purchase orders cannot be deleted.', 400);
+
+      if (po.status === POStatus.DELETED)
+        throw new AppError('Purchase order is already deleted.', 400);
+
+      await this.repository.update(id, {
+        status: POStatus.DELETED,
+        approvalComments: 'Marked deleted by creator'
+      });
+
+      return;
+
+    } catch (error: any) {
+      if (error instanceof AppError) throw error;
+
+      console.error('🔥 Unexpected delete failure:', { id, userId, error });
+
+      throw new AppError(
+        'Unexpected server error while deleting purchase order.',
+        500
+      );
+    }
+  }
+
+
 
   async getPurchaseOrder(id: string): Promise<Result<any>> {
     try {
@@ -493,6 +531,7 @@ export class PurchaseOrderService {
         notes: po.notes || "",
         baseAmount: po.baseAmount,
         taxAmount: po.taxAmount,
+        baseURL: baseURL_for_html,
         createdBy: {
           name: po.createdBy.name,
           department: po.createdBy.department || "N/A",
@@ -523,6 +562,8 @@ export class PurchaseOrderService {
             (overrides.additionalCharges ?? documentData.additionalCharges)?.reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
           ),
 
+        customerOrderDate: overrides.customerOrderDate || documentData.customerOrderDate,
+        
         // Vendor
         vendor: overrides.vendor ?? overrides.vendorOverride ?? documentData.vendor,
 
@@ -531,6 +572,8 @@ export class PurchaseOrderService {
 
         // Charges
         additionalCharges: overrides.additionalCharges ?? overrides.chargesOverride ?? documentData.additionalCharges,
+
+        baseURL: baseURL_for_html
       };
 
 
@@ -539,6 +582,12 @@ export class PurchaseOrderService {
       // ----------------------------
       // Generate and Upload PDF
       // ----------------------------
+
+
+      const logoPath = path.resolve("public", "favicon.ico");
+      const logoBase64 = fs.readFileSync(logoPath, "base64");
+      finalData.baseURL = logoBase64;
+
       const { url, hash } = await this.pdfService.generateAndUploadPurchaseOrder(finalData);
 
       const updatedPo = await this.repository.update(id, {
@@ -713,6 +762,7 @@ export class PurchaseOrderService {
       notes: po.notes || '',
       baseAmount: po.baseAmount,
       taxAmount: po.taxAmount,
+      baseURL: baseURL_for_html,
       createdBy: {
         name: po.createdBy.name,
         department: po.createdBy.department || 'N/A',

@@ -106,7 +106,7 @@ async function startServer() {
 
   // CORS must be first - before any other middleware
   app.use(cors({
-    origin: ['https://emprise.prossimatech.com', 'https://www.emprise.prossimatech.com', "https://client.prossimatech.com" ,'http://localhost:5173'],
+    origin: ['https://emprise.prossimatech.com', 'https://www.emprise.prossimatech.com', "https://client.prossimatech.com", 'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -119,6 +119,10 @@ async function startServer() {
   // Global middleware
   app.use(express.json());
   app.use(helmet());
+  const __dirnameResolved = path.resolve();
+  // This resolves to project root when using ts-node or transpiled build
+
+  app.use("/static", express.static(path.join(__dirnameResolved, "public")));
 
   // Initialize services
   if (!config.aws.accessKeyId || !config.aws.secretAccessKey || !config.aws.region || !config.aws.s3.bucket) {

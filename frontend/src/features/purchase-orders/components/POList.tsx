@@ -201,6 +201,7 @@ export function POList() {
     {
       header: "Actions",
       accessor: (row: PurchaseOrder) => (
+
         <div className="flex">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -240,23 +241,57 @@ export function POList() {
   ];
 
   // Filter orders with type checking
+  // const filteredOrders = useMemo(() => {
+  //   if (!Array.isArray(orders)) return [];
+
+  //   return orders.filter((order) => {
+  //     if (!order) return false;
+
+  //     const matchesSearch =
+  //       searchTerm === "" ||
+  //       order.site?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //       order.vendor?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //       order.loa?.loaNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+
+  //     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+
+  //     return matchesSearch && matchesStatus;
+  //   });
+  // }, [orders, searchTerm, statusFilter]);
+
   const filteredOrders = useMemo(() => {
     if (!Array.isArray(orders)) return [];
 
     return orders.filter((order) => {
       if (!order) return false;
 
+      // 1️⃣ If filter is "all", hide DELETED
+      if (statusFilter === "all" && order.status === "DELETED") {
+        return false;
+      }
+
+      // 2️⃣ If filter is "DELETED", show only deleted
+      if (statusFilter === "DELETED" && order.status !== "DELETED") {
+        return false;
+      }
+
+      // 3️⃣ Normal search filter
       const matchesSearch =
         searchTerm === "" ||
         order.site?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.vendor?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.loa?.loaNumber?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+      // 4️⃣ Normal status filter when not "all" or "DELETED"
+      const matchesStatus =
+        statusFilter === "all" ||
+        statusFilter === "DELETED" ||
+        order.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchTerm, statusFilter]);
+
 
   // Calculate pagination values
   const totalItems = filteredOrders.length;
@@ -273,58 +308,59 @@ export function POList() {
     <div className="space-y-6">
       {/* Filters Section */}
       <Card>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-4 p-4">
-            <div className="col-span-2">
-              <Input
-                placeholder="Search orders..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div className="col-span-1">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="DRAFT">Draft</SelectItem>
-                  <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
-                  <SelectItem value="APPROVED">Approved</SelectItem>
-                  <SelectItem value="REJECTED">Rejected</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1">
-              <Select
-                value={`${sortBy}-${sortOrder}`}
-                onValueChange={(value) => {
-                  const [field, order] = value.split('-');
-                  setSortBy(field);
-                  setSortOrder(order as 'asc' | 'desc');
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="createdAt-desc">Date (Newest)</SelectItem>
-                  <SelectItem value="createdAt-asc">Date (Oldest)</SelectItem>
-                  <SelectItem value="totalAmount-desc">Amount (High to Low)</SelectItem>
-                  <SelectItem value="totalAmount-asc">Amount (Low to High)</SelectItem>
-                  <SelectItem value="poNumber-asc">PO Number (A-Z)</SelectItem>
-                  <SelectItem value="poNumber-desc">PO Number (Z-A)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2 flex justify-end">
-              <Button onClick={() => navigate('/purchase-orders/new')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Order
-              </Button>
-              {/* <Button
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-4 p-4">
+          <div className="col-span-2">
+            <Input
+              placeholder="Search orders..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <div className="col-span-1">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="DRAFT">Draft</SelectItem>
+                <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="DELETED">Deleted</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-1">
+            <Select
+              value={`${sortBy}-${sortOrder}`}
+              onValueChange={(value) => {
+                const [field, order] = value.split('-');
+                setSortBy(field);
+                setSortOrder(order as 'asc' | 'desc');
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt-desc">Date (Newest)</SelectItem>
+                <SelectItem value="createdAt-asc">Date (Oldest)</SelectItem>
+                <SelectItem value="totalAmount-desc">Amount (High to Low)</SelectItem>
+                <SelectItem value="totalAmount-asc">Amount (Low to High)</SelectItem>
+                <SelectItem value="poNumber-asc">PO Number (A-Z)</SelectItem>
+                <SelectItem value="poNumber-desc">PO Number (Z-A)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 flex justify-end">
+            <Button onClick={() => navigate('/purchase-orders/new')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create New Order
+            </Button>
+            {/* <Button
                 variant="outline"
                 className="w-full"
                 onClick={handleExportExcel}
@@ -332,8 +368,8 @@ export function POList() {
                 <Download className="mr-2 h-4 w-4" />
                 Export to Excel
               </Button> */}
-            </div>
           </div>
+        </div>
       </Card>
 
       {/* Purchase Orders Table */}
@@ -347,7 +383,7 @@ export function POList() {
             loading={loading}
             onRowClick={(row) => navigate(`/purchase-orders/${row.id}`)}
           />
-          
+
           {/* Pagination */}
           {totalItems > pageSize && (
             <Pagination>

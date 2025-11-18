@@ -66,6 +66,7 @@ export interface PDFGenerationData {
   loaNumber: string;
   createdAt: Date;
   totalAmount: number;
+  customerOrderDate?: Date;
   vendor: {
     name: string;
     email: string;
@@ -85,6 +86,7 @@ export interface PDFGenerationData {
   notes: string;
   baseAmount: number;
   taxAmount: number;
+  baseURL: string;
   createdBy: {
     name: string;
     department: string;

@@ -64,7 +64,7 @@ export interface POItem extends POItemFormData {
 export interface PurchaseOrder {
   id: string;
   poNumber: string;
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'DELETED';
   loaId: string;
   vendorId: string;
   items: POItem[];

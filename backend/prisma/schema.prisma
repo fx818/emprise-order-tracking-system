@@ -443,6 +443,7 @@ enum POStatus {
   PENDING_APPROVAL
   APPROVED
   REJECTED
+  DELETED
 }
 
 enum TenderStatus {

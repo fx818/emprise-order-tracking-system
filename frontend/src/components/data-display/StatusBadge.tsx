@@ -16,6 +16,8 @@ const statusColors = {
   CANCELLED: 'bg-red-500',
   AWARDED: 'bg-blue-500',
   NOT_AWARDED: 'bg-gray-500',
+  COMPLETED: 'bg-purple-500',
+  DELETED: 'bg-black',
 } as const;
 
 export const StatusBadge = ({ status }: StatusBadgeProps) => {

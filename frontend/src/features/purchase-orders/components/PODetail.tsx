@@ -104,7 +104,7 @@ export function PODetail() {
       maximumFractionDigits: 2
     })}`;
   };
-  const handleStatusChange = async (action: "submit" | "complete") => {
+  const handleStatusChange = async (action: "submit" | "complete" | "delete") => {
     if (!id) {
       showError("Invalid Order ID");
       return;
@@ -121,10 +121,19 @@ export function PODetail() {
             ? "Purchase order has been auto-approved"
             : "Purchase order submitted for approval successfully"
         );
-      } else {
+      } else if (action === "complete") {
         await markAsCompleted(id);
         showSuccess("Purchase order marked as completed");
+      } else if (action === "delete") {
+        const isDeleted = await deletePurchaseOrder(id);
+
+        if (isDeleted) {
+          showSuccess("Purchase order deleted successfully");
+          // optionally refresh or redirect
+          // refetch();
+        }
       }
+
 
       // Refresh order
       const updatedOrder = await getPurchaseOrder(id);
@@ -180,6 +189,7 @@ export function PODetail() {
                 Edit Order
               </Button>
 
+
               <Button
                 onClick={() => handleStatusChange("submit")}
                 disabled={submitting}
@@ -197,8 +207,23 @@ export function PODetail() {
                 )}
               </Button>
 
+
+              {/* <Button
+                variant="destructive"
+                disabled={submitting}
+                onClick={async () => {
+                  const confirmed = window.confirm(
+                    "Are you sure you want to permanently delete this purchase order?"
+                  );
+                  if (!confirmed) return;
+                  handleStatusChange("delete")
+                }}
+                className="ml-2 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Mark Delete
+              </Button> */}
               {/* 🗑️ Delete Button for DRAFT only */}
-              <Button
+              {/* <Button
                 variant="destructive"
                 disabled={submitting}
                 onClick={async () => {
@@ -217,7 +242,7 @@ export function PODetail() {
               >
                 <AlertTriangle className="h-4 w-4 mr-2" />
                 Delete
-              </Button>
+              </Button> */}
             </>
           )}
 
@@ -239,6 +264,21 @@ export function PODetail() {
               )}
             </Button>
           )}
+
+          <Button
+          variant="destructive"
+                disabled={submitting}
+                onClick={async () => {
+                  const confirmed = window.confirm(
+                    "Are you sure you want to permanently delete this purchase order?"
+                  );
+                  if (!confirmed) return;
+                  handleStatusChange("delete")
+                }}
+                className="ml-2 bg-red-600 hover:bg-red-700 text-white"
+          >
+            Mark Delete
+          </Button>
         </div>
 
       </div>

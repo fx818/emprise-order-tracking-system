@@ -58,20 +58,33 @@ export class PurchaseOrderController {
   deletePurchaseOrder = async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = req.user?.userId;
-      if (!userId) {
-        throw new AppError('User ID not found', 401);
-      }
-
       const { id } = req.params;
-      await this.service.deletePurchaseOrder(id, userId);
 
-      res.status(204).send(); // no return
-    } catch (error: any) {
-      if (error instanceof AppError) {
-        throw error;
+      if (!userId) {
+        res.status(401).json({ status: 'error', message: 'User ID not found' });
+        return;
       }
 
-      throw new AppError(error.message || 'Failed to delete purchase order');
+      if (!id) {
+        res.status(400).json({ status: 'error', message: 'Purchase order ID is required' });
+        return;
+      }
+
+      await this.service.markAsDeletedPurchaseOrder(id, userId);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Purchase order marked as deleted'
+      });
+      return;
+
+    } catch (error: any) {
+      const status = error instanceof AppError ? error.statusCode : 500;
+      const message = error instanceof AppError ? error.message : 'Failed to delete purchase order';
+
+      console.error('Delete PO Error:', { id: req.params.id, userId: req.user?.userId, error });
+
+      res.status(status).json({ status: 'error', message });
     }
   };
 

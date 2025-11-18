@@ -4,7 +4,8 @@ export enum POStatus {
   DRAFT = 'DRAFT',
   PENDING_APPROVAL = 'PENDING_APPROVAL',
   APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED'
+  REJECTED = 'REJECTED',
+  DELETED = 'DELETED',
 }
 
 export enum SiteStatus {

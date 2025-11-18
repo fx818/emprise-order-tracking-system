@@ -206,23 +206,41 @@ export function usePurchaseOrders() {
   };
 
   const deletePurchaseOrder = async (id: string) => {
-    try {
-      setLoading(true);
-      const response = await apiClient.delete(`/purchase-orders/${id}`);
+  try {
+    setLoading(true);
 
-      if (!response.data || response.data.status !== 'success') {
-        throw new Error(response.data?.message || 'Failed to delete purchase order');
-      }
+    const response = await apiClient.delete(`/purchase-orders/${id}`);
 
-      showSuccess('Purchase order deleted successfully');
-    } catch (error: any) {
-      console.error('Delete PO error:', error.response || error);
-      showError(error.response?.data?.message || 'Failed to delete purchase order');
-      throw error;
-    } finally {
-      setLoading(false);
+    console.log("📥 API Response:", response);
+
+    // Only show success if backend explicitly marked success
+    if (response.status === 200 && response.data?.status === "success") {
+      showSuccess(response.data.message || "Purchase order deleted successfully");
+      return true;
     }
-  };
+
+    // If backend returns but not success → treat as error
+    const errorMessage = response.data?.message || "Failed to delete purchase order";
+    showError(errorMessage);
+    return false;
+
+  } catch (error: any) {
+    console.error("❌ Delete PO Error:", error);
+
+    const errorMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to delete purchase order";
+
+    showError(errorMessage);
+    return false; // ensure UI knows it failed
+
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   // Add a helper function to check if user can submit PO
   const canSubmitPurchaseOrder = (po: any) => {

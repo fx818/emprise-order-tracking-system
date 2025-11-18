@@ -15,6 +15,25 @@ import { RichTextEditor } from "../../../components/ui/rich-text-editor";
 import VendorEditModal from "../components/modals/VendorEditModal";
 import ItemsEditModal from "../components/modals/ItemsEditModal";
 import ChargesEditModal from "../components/modals/ChargesEditModal";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "../../../components/ui/form";
+
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "../../../components/ui/popover";
+
+import { format } from "date-fns";
+import { cn } from "../../../lib/utils";
+import { CalendarIcon } from "lucide-react";
+import { Calendar } from "../../../components/ui/calendar";
 
 export default function EditPODocumentPage() {
     const { id } = useParams();
@@ -39,7 +58,8 @@ export default function EditPODocumentPage() {
             notes: "",
             shipToAddress: "",
             taxAmount: 0,
-            totalAmount: 0   // <-- ADD THIS
+            totalAmount: 0,   // <-- ADD THIS
+            customerOrderDate: undefined as Date | undefined,
         },
     });
 
@@ -60,7 +80,11 @@ export default function EditPODocumentPage() {
                     notes: data.notes || "",
                     shipToAddress: data.shipToAddress || "",
                     taxAmount: data.taxAmount,
-                    totalAmount: data.totalAmount // <--- ADD THIS
+                    totalAmount: data.totalAmount, // <--- ADD THIS
+                    // FIX: Convert API string to Date object
+                    customerOrderDate: data.customerOrderDate
+                        ? new Date(data.customerOrderDate)
+                        : undefined
                 });
             } catch {
                 showError("Failed to load purchase order");
@@ -88,19 +112,32 @@ export default function EditPODocumentPage() {
         try {
             setSaving(true);
 
+            const overrides: any = {
+                titleText: values.titleText,
+                requirementDesc: values.requirementDesc,
+                termsConditions: values.termsConditions,
+                notes: values.notes,
+                shipToAddress: values.shipToAddress,
+                taxAmount: Number(values.taxAmount),
+                totalAmount: Number(values.totalAmount),
+                vendor: po.vendor,
+                items: po.items,
+                additionalCharges: po.additionalCharges,
+            };
+
+            // 2. CHECK: Only add customerOrderDate if the user actually selected one
+            // If values.customerOrderDate is "" (empty), we skip this line.
+            // This forces the backend to keep the existing database value.
+
+            // FIX: Convert Date object back to string for API
+            let dateString = "";
+            if (values.customerOrderDate) {
+                dateString = format(values.customerOrderDate, "yyyy-MM-dd");
+            }
+            overrides.customerOrderDate = dateString || undefined;
+
             const overridePayload = {
-                overrides: {
-                    titleText: values.titleText,
-                    requirementDesc: values.requirementDesc,
-                    termsConditions: values.termsConditions,
-                    notes: values.notes,
-                    shipToAddress: values.shipToAddress,
-                    taxAmount: Number(values.taxAmount),
-                    totalAmount: Number(values.totalAmount), // <--- ADD THIS
-                    vendor: po.vendor,
-                    items: po.items,
-                    additionalCharges: po.additionalCharges,
-                }
+                overrides: overrides // Pass the constructed object
             };
 
             const regen = await apiClient.post(`/purchase-orders/${id}/generate-pdf`, overridePayload);
@@ -122,153 +159,194 @@ export default function EditPODocumentPage() {
     if (loading) return <div className="p-8 text-center">Loading...</div>;
 
     return (
-        <>
-            {/* Vendor Modal */}
-            {showVendorModal && (
-                <VendorEditModal
-                    vendor={po.vendor}
-                    onClose={() => setShowVendorModal(false)}
-                    onSave={(updatedVendor) => {
-                        setPo((prev: any) => ({ ...prev, vendor: updatedVendor }));
-                        markUnsaved();
-                    }}
-                />
-            )}
+        <Form {...form}>
+            <>
+                {/* Vendor Modal */}
+                {showVendorModal && (
+                    <VendorEditModal
+                        vendor={po.vendor}
+                        onClose={() => setShowVendorModal(false)}
+                        onSave={(updatedVendor) => {
+                            setPo((prev: any) => ({ ...prev, vendor: updatedVendor }));
+                            markUnsaved();
+                        }}
+                    />
+                )}
 
-            {/* Items Modal */}
-            {showItemsModal && (
-                <ItemsEditModal
-                    items={po.items}
-                    onClose={() => setShowItemsModal(false)}
-                    onSave={(updatedItems) => {
-                        setPo((prev: any) => ({ ...prev, items: updatedItems }));
-                        markUnsaved();
-                    }}
-                />
-            )}
+                {/* Items Modal */}
+                {showItemsModal && (
+                    <ItemsEditModal
+                        items={po.items}
+                        onClose={() => setShowItemsModal(false)}
+                        onSave={(updatedItems) => {
+                            setPo((prev: any) => ({ ...prev, items: updatedItems }));
+                            markUnsaved();
+                        }}
+                    />
+                )}
 
-            {/* Charges Modal */}
-            {showChargesModal && (
-                <ChargesEditModal
-                    charges={po.additionalCharges}
-                    onClose={() => setShowChargesModal(false)}
-                    onSave={(updatedCharges) => {
-                        setPo((prev: any) => ({ ...prev, additionalCharges: updatedCharges }));
-                        markUnsaved();
-                    }}
-                />
-            )}
+                {/* Charges Modal */}
+                {showChargesModal && (
+                    <ChargesEditModal
+                        charges={po.additionalCharges}
+                        onClose={() => setShowChargesModal(false)}
+                        onSave={(updatedCharges) => {
+                            setPo((prev: any) => ({ ...prev, additionalCharges: updatedCharges }));
+                            markUnsaved();
+                        }}
+                    />
+                )}
 
-            <div className="p-4 md:p-6 space-y-4">
+                <div className="p-4 md:p-6 space-y-4">
 
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <Button variant="ghost" onClick={() => navigate(`/purchase-orders/${id}`)}>
-                        <ArrowLeft className="h-4 w-4 mr-2" /> Back
-                    </Button>
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                        <Button variant="ghost" onClick={() => navigate(`/purchase-orders/${id}`)}>
+                            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                        </Button>
 
-                    {unsaved && <p className="text-sm text-red-600 font-medium animate-pulse">Unsaved changes…</p>}
-                </div>
+                        {unsaved && <p className="text-sm text-red-600 font-medium animate-pulse">Unsaved changes…</p>}
+                    </div>
 
-                {/* Layout Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Layout Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                    {/* PDF Preview */}
-                    <Card className="h-[85vh]">
-                        <CardHeader><CardTitle>Preview</CardTitle></CardHeader>
-                        <CardContent className="h-full">
-                            {po?.documentUrl ? (
-                                <iframe src={po.documentUrl} className="w-full h-full rounded border" />
-                            ) : (
-                                <div className="text-center text-muted-foreground mt-10">No PDF generated</div>
-                            )}
-                        </CardContent>
-                    </Card>
+                        {/* PDF Preview */}
+                        <Card className="h-[85vh]">
+                            <CardHeader><CardTitle>Preview</CardTitle></CardHeader>
+                            <CardContent className="h-full">
+                                {po?.documentUrl ? (
+                                    <iframe src={po.documentUrl} className="w-full h-full rounded border" />
+                                ) : (
+                                    <div className="text-center text-muted-foreground mt-10">No PDF generated</div>
+                                )}
+                            </CardContent>
+                        </Card>
 
-                    {/* Edit Form */}
-                    <Card className="h-[85vh] overflow-y-auto">
-                        <CardHeader><CardTitle>Edit Content</CardTitle></CardHeader>
-                        <CardContent className="space-y-6">
+                        {/* Edit Form */}
+                        <Card className="h-[85vh] overflow-y-auto">
+                            <CardHeader><CardTitle>Edit Content</CardTitle></CardHeader>
+                            <CardContent className="space-y-6">
 
-                            {/* External Editors */}
-                            <div className="flex flex-col gap-2">
-                                <Button variant="outline" onClick={() => setShowVendorModal(true)}>
-                                    <Edit className="h-4 w-4 mr-2" /> Edit Vendor
-                                </Button>
+                                {/* External Editors */}
+                                <div className="flex flex-col gap-2">
+                                    <Button variant="outline" onClick={() => setShowVendorModal(true)}>
+                                        <Edit className="h-4 w-4 mr-2" /> Edit Vendor
+                                    </Button>
 
-                                <Button variant="outline" onClick={() => setShowItemsModal(true)}>
-                                    <Edit className="h-4 w-4 mr-2" /> Edit Items
-                                </Button>
+                                    <Button variant="outline" onClick={() => setShowItemsModal(true)}>
+                                        <Edit className="h-4 w-4 mr-2" /> Edit Items
+                                    </Button>
 
-                                <Button variant="outline" onClick={() => setShowChargesModal(true)}>
-                                    <Edit className="h-4 w-4 mr-2" /> Edit Charges
-                                </Button>
-                            </div>
+                                    <Button variant="outline" onClick={() => setShowChargesModal(true)}>
+                                        <Edit className="h-4 w-4 mr-2" /> Edit Charges
+                                    </Button>
+                                </div>
 
-                            {/* Editable fields */}
+                                {/* Editable fields */}
 
-                            {/* <div>
+                                {/* <div>
                                 <label className="font-medium block mb-1">Document Title</label>
                                 <Textarea {...form.register("titleText")} onChange={markUnsaved} />
                             </div> */}
 
-                            <div>
-                                <label className="font-medium block mb-1">Requirement Description</label>
-                                <Textarea rows={3} {...form.register("requirementDesc")} onChange={markUnsaved} />
-                            </div>
+                                <div>
+                                    <label className="font-medium block mb-1">Requirement Description</label>
+                                    <Textarea rows={3} {...form.register("requirementDesc")} onChange={markUnsaved} />
+                                </div>
 
-                            <div>
-                                <label className="font-medium block mb-1">Terms & Conditions</label>
-                                <RichTextEditor
-                                    value={form.watch("termsConditions")}
-                                    onChange={(html) => { form.setValue("termsConditions", html); markUnsaved(); }}
+                                <FormField
+                                    control={form.control}
+                                    name="customerOrderDate"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-col">
+                                            <FormLabel>Customer Order Date</FormLabel>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <FormControl>
+                                                        <Button
+                                                            variant={"outline"}
+                                                            className={cn(
+                                                                "w-full pl-3 text-left font-normal",
+                                                                !field.value && "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {/* FIX: field.value is now strictly Date | undefined */}
+                                                            {field.value ? (
+                                                                format(field.value, "PPP")
+                                                            ) : (
+                                                                <span>Pick a date</span>
+                                                            )}
+                                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                        </Button>
+                                                    </FormControl>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar
+                                                        mode="single"
+                                                        selected={field.value} // FIX: Compatible with Date type
+                                                        onSelect={(date) => {
+                                                            field.onChange(date);
+                                                            markUnsaved();
+                                                        }}
+                                                        disabled={(date) => date < new Date("1900-01-01")}
+                                                        initialFocus
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
                                 />
-                            </div>
 
-                            <div>
-                                <label className="font-medium block mb-1">Notes</label>
-                                <RichTextEditor
-                                    value={form.watch("notes")}
-                                    onChange={(html) => { form.setValue("notes", html); markUnsaved(); }}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="font-medium block mb-1">Shipping Address</label>
-                                <Textarea rows={3} {...form.register("shipToAddress")} onChange={markUnsaved} />
-                            </div>
-
-                            <div>
-                                <label className="font-medium block mb-1">Tax Amount (₹)</label>
-                                <input
-                                    type="number"
-                                    className="border rounded p-2 w-full"
-                                    {...form.register("taxAmount")}
-                                    onChange={markUnsaved}
-                                />
-                            </div>
-
-                            {/* Total Amount */}
-                            <div>
-                                <label className="font-medium mb-1 block">Total Amount (₹)</label>
-                                <input
-                                    type="number"
-                                    className="border rounded p-2 w-full"
-                                    {...form.register("totalAmount")}
-                                    onChange={markUnsaved}
-                                />
-                            </div>
+                                <div>
+                                    <label className="font-medium block mb-1">Terms & Conditions</label>
+                                    <RichTextEditor
+                                        value={form.watch("termsConditions")}
+                                        onChange={(html) => { form.setValue("termsConditions", html); markUnsaved(); }}
+                                    />
+                                </div>
 
 
-                            <Button className="w-full" disabled={saving} onClick={form.handleSubmit(onSubmit)}>
-                                {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Regenerating…</> : "Save & Regenerate"}
-                            </Button>
+                                <div>
+                                    <label className="font-medium block mb-1">Shipping Address</label>
+                                    <Textarea rows={3} {...form.register("shipToAddress")} onChange={markUnsaved} />
+                                </div>
 
-                        </CardContent>
-                    </Card>
+                                <div>
+                                    <label className="font-medium block mb-1">Tax Amount (₹)</label>
+                                    <input
+                                        type="number"
+                                        className="border rounded p-2 w-full"
+                                        {...form.register("taxAmount")}
+                                        onChange={markUnsaved}
+                                    />
+                                </div>
 
+                                {/* Total Amount */}
+                                <div>
+                                    <label className="font-medium mb-1 block">Total Amount (₹)</label>
+                                    <input
+                                        type="number"
+                                        className="border rounded p-2 w-full"
+                                        {...form.register("totalAmount")}
+                                        onChange={markUnsaved}
+                                    />
+                                </div>
+
+
+                                <Button className="w-full" disabled={saving} onClick={form.handleSubmit(onSubmit)}>
+                                    {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Regenerating…</> : "Save & Regenerate"}
+                                </Button>
+
+                            </CardContent>
+                        </Card>
+
+                    </div>
                 </div>
-            </div>
-        </>
+            </>
+
+
+        </Form>
     );
 }

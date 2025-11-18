@@ -10,12 +10,12 @@ export class BulkImportFdrService {
   /**
    * Map Excel status to database enum
    */
-  private mapStatus(excelStatus?: string): 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'RETURNED' {
+  private mapStatus(excelStatus?: string): 'RUNNING' | 'AVAILABLE_FOR_RELEASE' | 'CANCELLED' | 'RETURNED' {
     if (!excelStatus) return 'RUNNING';
 
-    const statusMap: Record<string, 'RUNNING' | 'COMPLETED' | 'CANCELLED' | 'RETURNED'> = {
+    const statusMap: Record<string, 'RUNNING' | 'AVAILABLE_FOR_RELEASE' | 'CANCELLED' | 'RETURNED'> = {
       'Running': 'RUNNING',
-      'Completed': 'COMPLETED',
+      'Available for release': 'AVAILABLE_FOR_RELEASE',
       'Cancelled': 'CANCELLED',
       'FD Cancelled': 'CANCELLED',
       'FD Cancelled - new one made instead': 'CANCELLED',
